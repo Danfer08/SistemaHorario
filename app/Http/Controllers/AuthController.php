@@ -53,6 +53,8 @@ class AuthController extends Controller
                     'id' => $user->id,
                     'name' => $user->name,
                     'email' => $user->email,
+                    'roles' => $user->getRoleNames(),
+                    'permissions' => $user->getAllPermissions()->pluck('name'), // <-- AÑADIDO: Enviar permisos
                 ],
                 'token' => $token
             ], 200);
@@ -114,6 +116,8 @@ class AuthController extends Controller
                     'id' => $user->id,
                     'name' => $user->name,
                     'email' => $user->email,
+                    'roles' => $user->getRoleNames(), // <-- AÑADIDO
+                    'permissions' => $user->getAllPermissions()->pluck('name'), // <-- AÑADIDO
                     'created_at' => $user->created_at,
                 ],
                 'token' => $token
@@ -148,6 +152,8 @@ class AuthController extends Controller
                 'id' => $user->id,
                 'name' => $user->name,
                 'email' => $user->email,
+                'roles' => $user->getRoleNames(), // <-- AÑADIDO
+                'permissions' => $user->getAllPermissions()->pluck('name'), // <-- AÑADIDO
                 'created_at' => $user->created_at,
             ],
         ], 200);

@@ -1,13 +1,14 @@
 import React, { useState } from 'react';
 import { LogOut, Home, Users, Briefcase, Calendar, BookOpen, Clock, ListChecks, Factory, BarChart } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import { usePermissions } from '../hooks/usePermissions'; // <-- 1. Importar el nuevo hook
 
 // Elimina la lógica de auth local y usa el contexto compartido
 
 // --- COMPONENTES DE LA INTERFAZ ---
 
 // Datos de la navegación basados en la imagen del usuario
-const navigationData = [
+const allNavigationData = [
     {
         section: 'Gestión Horaria',
         items: [
@@ -20,17 +21,19 @@ const navigationData = [
         section: 'Administración',
         items: [
             { name: 'Crear Horario', icon: Clock, key: 'crear-horario' },
-            { name: 'Gestión Profesores', icon: Briefcase, key: 'gestion-profesores' },
-            { name: 'Gestión Cursos', icon: ListChecks, key: 'gestion-cursos' },
-            { name: 'Gestión Salones', icon: Factory, key: 'gestion-salones' },
-        ]
+            { name: 'Gestión Profesores', icon: Briefcase, key: 'gestion-profesores', permission: 'crear_profesores' },
+            { name: 'Gestión Cursos', icon: ListChecks, key: 'gestion-cursos', permission: 'gest_cursos' },
+            { name: 'Gestión Salones', icon: Factory, key: 'gestion-salones', permission: 'get_salones' },
+        ],
+        permission: 'admin.access' // Permiso general para ver esta sección
     },
     {
         section: 'Seguridad',
         items: [
-            { name: 'Usuarios', icon: Users, key: 'usuarios' },
-            { name: 'Roles', icon: BarChart, key: 'roles' },
-        ]
+            { name: 'Usuarios', icon: Users, key: 'usuarios', permission: 'gest_usuarios' },
+            { name: 'Roles', icon: BarChart, key: 'roles', permission: 'gest_roles' },
+        ],
+        permission: 'security.access' // Permiso general para ver esta sección
     }
 ];
 
@@ -51,6 +54,23 @@ const NavItem = ({ icon: Icon, name, isSelected, onClick }) => (
 
 // Componente de la Barra Lateral (Sidebar)
 const Sidebar = ({ currentView, setCurrentView, logout, user }) => {
+    const { can } = usePermissions(); // <-- 2. Usar el hook de permisos
+
+    // 3. Filtrar la navegación basada en los permisos del usuario
+    const navigationData = allNavigationData
+        .map(section => {
+            // Si la sección requiere un permiso y el usuario no lo tiene, se descarta la sección entera.
+            if (section.permission && !can(section.permission)) {
+                return null;
+            }
+            // Filtra los items dentro de la sección
+            const filteredItems = section.items.filter(item => !item.permission || can(item.permission));
+
+            // Si después de filtrar no quedan items, no mostrar la sección
+            return filteredItems.length > 0 ? { ...section, items: filteredItems } : null;
+        })
+        .filter(Boolean); // Elimina las secciones nulas
+
     // Colores basados en la imagen (Azul para barra lateral, Gris claro para fondo, Gris oscuro para texto)
     const sidebarBg = 'bg-gray-100'; // Fondo gris claro de la barra lateral
     const accentColor = 'bg-blue-500'; // Color de acento para la línea divisoria
@@ -112,7 +132,7 @@ const MainContent = ({ currentView, user }) => {
     let ContentComponent = null;
 
     // Buscar el nombre de la vista actual
-    navigationData.forEach(section => {
+    allNavigationData.forEach(section => { // Usamos la data completa para encontrar el título
         const item = section.items.find(i => i.key === currentView);
         if (item) {
             contentTitle = item.name;

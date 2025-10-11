@@ -3,6 +3,14 @@ import React, { useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext'; 
 import { User, Mail, Lock, CheckCircle } from 'lucide-react'; // Usando iconos Lucide
 
+/*
+Formulario dejado de usar, pero mantenido para referencia futura.
+El formulario de registro fue eliminado de la vista AuthPage.
+Sin embargo, este componente se mantiene en el código base para referencia futura o posibles reimplementaciones.
+*/
+
+
+
 const RegisterForm = ({ onToggleMode }) => {
     // Es CRÍTICO que la función 'register' esté disponible en el contexto
     const { register } = useAuth(); 
