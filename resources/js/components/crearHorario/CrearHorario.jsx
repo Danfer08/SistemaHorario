@@ -40,7 +40,20 @@ const CrearHorarioView = ({ horarioId }) => {
   } = useHorario(horarioId);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-white p-6">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-white p-6 relative">
+      {/* --- INICIO: INDICADOR DE CARGA --- */}
+      {loading && horarioId && (
+        <div className="absolute inset-0 bg-white bg-opacity-80 flex items-start justify-center pt-40 z-50">
+          <div className="flex flex-col items-center">
+            <Loader className="w-12 h-12 text-blue-600 animate-spin" />
+            <p className="mt-4 text-lg text-gray-700">Cargando horario...</p>
+          </div>
+        </div>
+      )}
+      {/* --- FIN: INDICADOR DE CARGA --- */}
+
+      {/* Ocultar contenido principal mientras carga para evitar parpadeos */}
+      <div style={{ visibility: loading && horarioId ? 'hidden' : 'visible' }}>
       {/* Header */}
       <div className="mb-6">
         <div className="flex items-center justify-between">
@@ -57,7 +70,7 @@ const CrearHorarioView = ({ horarioId }) => {
               className="flex items-center gap-2 px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition"
             >
               <Save className="w-4 h-4" />
-              Guardar Borrador
+              Borrar Conflictos
             </button>
             <button 
               onClick={publicarHorario}
@@ -119,6 +132,7 @@ const CrearHorarioView = ({ horarioId }) => {
         salones={salones}
         handleAsignarCurso={handleAsignarCurso}
       />
+      </div>
     </div>
   );
 };

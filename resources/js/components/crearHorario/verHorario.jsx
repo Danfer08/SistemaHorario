@@ -4,9 +4,7 @@ import { Clock, Download } from 'lucide-react';
 
 // Hooks y componentes
 import { useHorario } from '../crearHorario/hook/horarioHooks';
-import ModalAsignacion from '../crearHorario/modalAssignHorario';
 import HorarioGrid from '../crearHorario/others/gridHorario';
-import PanelCursos from '../crearHorario/others/panelCursos';
 import ConfiguracionPeriodo from '../crearHorario/others/configPeriodo';
 import Alertas from '../crearHorario/others/alerts';
 
@@ -20,10 +18,7 @@ const ViewVerhorario = ({ horarioId }) => {
     horarioGrid,
     conflictos,
     loading,
-    error,
-    cursosPendientes,
-    cursosAsignados,
-    cursosDisponibles,
+    error
   } = useHorario(horarioId);
 
   return (
@@ -59,17 +54,8 @@ const ViewVerhorario = ({ horarioId }) => {
       {/* Alertas */}
       <Alertas error={error} conflictos={conflictos} />
 
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-        {/* Panel Lateral - Cursos Disponibles */}
-        <PanelCursos 
-          cursosPendientes={[]} // No mostrar cursos pendientes en modo vista
-          cursosAsignados={cursosAsignados}
-          cursosDisponibles={cursosDisponibles}
-        />
-
-        {/* Grid de Horario */}
-        <div className="lg:col-span-3">
-          <div className="bg-white rounded-xl shadow-md p-6 overflow-x-auto">
+      <div className="grid grid-cols-1 gap-6">
+        <div className="bg-white rounded-xl shadow-md p-6 overflow-x-auto">
             <h3 className="text-lg font-semibold text-gray-800 mb-4">
               Horario - {selectedCiclo}° Ciclo | {selectedPeriodo.año}-{selectedPeriodo.etapa}
             </h3>
@@ -81,7 +67,6 @@ const ViewVerhorario = ({ horarioId }) => {
               isReadOnly={true}
             />
           </div>
-        </div>
       </div>
     </div>
   );

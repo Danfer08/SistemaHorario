@@ -33,11 +33,12 @@ export const useHorario = (horarioId) => {
 
   // Cargar cursos cuando cambie el ciclo
   useEffect(() => {
-    if (selectedCiclo && horarioId) {
+    // Solo cargar cursos si el ciclo cambia por acción del usuario (no en la carga inicial)
+    if (selectedCiclo && horarioActual) {
       cargarCursosPorCiclo();
-      cargarHorarioGrid(horarioId); // Recargar el grid para el nuevo ciclo
+      cargarHorarioGrid(horarioActual.idHorario);
     }
-  }, [selectedCiclo]);
+  }, [selectedCiclo]); // Se quitaron dependencias para evitar recargas no deseadas
 
   const cargarDatosIniciales = async () => {
     try {
@@ -54,10 +55,10 @@ export const useHorario = (horarioId) => {
     }
   };
 
-  const cargarCursosPorCiclo = async () => {
+  const cargarCursosPorCiclo = async (cicloParam = selectedCiclo) => {
     try {
       const response = await axios.get(`/api/cursos/ciclo/${selectedCiclo}`);
-      setCursosDisponibles(response.data.data);
+      setCursosDisponibles(response.data.data || []);
     } catch (error) {
       console.error('Error al cargar cursos:', error);
       setError('Error al cargar los cursos del ciclo');
@@ -66,26 +67,28 @@ export const useHorario = (horarioId) => {
 
   const cargarHorario = async (id) => {
     try {
-      // Esta función ahora solo carga un horario existente por su ID
+      setLoading(true); // Iniciar carga
+      setError(null);
+
+      // 1. Cargar los datos principales del horario
       const response = await axios.get(`/api/horarios/${id}`);
       const horario = response.data.data;
       setHorarioActual(horario);
       setSelectedPeriodo({ año: horario.año, etapa: horario.etapa });
-      const cicloInicial = horario.etapa === 'II' ? '2' : '1';
-      setSelectedCiclo(cicloInicial);
-
-      cargarHorarioGrid(id, cicloInicial); // Pasar el ciclo directamente
+ // Actualizar el ciclo en la UI al final
     } catch (error) {
       console.error('Error al cargar el horario:', error);
       setError('Error al cargar el horario. Puede que no exista.');
+    } finally {
+      setLoading(false); // Desactivar el loading al finalizar (éxito o error)
     }
   };
 
-  const cargarHorarioGrid = async (horarioId, ciclo = selectedCiclo) => {
+  const cargarHorarioGrid = async (horarioId, cicloParam = selectedCiclo) => {
     try {
       const response = await axios.get(`/api/horarios/${horarioId}/grid`, {
         params: {
-          ciclo: ciclo // Usar el ciclo pasado como parámetro o el del estado
+          ciclo: cicloParam // Usar el ciclo pasado como parámetro o el del estado
         }
       });
 
@@ -226,12 +229,14 @@ export const useHorario = (horarioId) => {
       await validarConflictos();
     } catch (error) {
       console.error('Error al asignar curso:', error);
+
       if (error.response?.data?.conflictos) {
         setConflictos(error.response.data.conflictos);
-        setError('No se puede asignar el curso porque genera conflictos.');
       } else {
         setError('Error al asignar el curso. ' + (error.response?.data?.message || ''));
       }
+        setShowModal(false);
+        setCursoModal(null);
     }
   };
 

@@ -1,0 +1,45 @@
+
+
+Hola gemini quiero que analices este apartado del codigo de crearHorario (dentro del directorio crear horario). Y puedas hacer lo siguiente:
+"
+
+Ahora hagamos un cambio mayor. 
+La idea es la siguiente:
+El modal de asignación tiene que crear cuantos grupos habrá en un curso (1,2 o 3 ), y tambien que por cada grupo cuantas sessiones habrá por cada uno, y tiene que ser posible asignar por cada 
+session un horario concleto (dia, horainicio y horafin elegibles).
+
+
+Por ejemplo x curso tiene horario en el ciclo 2
+
+Este tiene 2 grupos disponibles
+Un grupo 1 tiene 20 estudiantes, lo dará el profesor jhon 
+Otro grupo 2 tiene 23 estudiantes, lo dará el profesor jhon (aunque puede ser otro profesor)
+
+ahora el grupo 1 tiene que 2 sessiones en la semana 
+- una session es el martes de 12:00 a 14:00 en el salon 1
+-la otra session es el viernes de 18:00 a 20:00 en el salon 2
+
+El otro grupo 2 tiene solamente una session en la semana 
+-la session es a las 18:00 a 20:00 el lunes en el salon 1
+
+Por lo que el funcionamiento debe ser lo siguiente:
+
+No se podrá asignar un horario en un curso hasta que se dé los siguientes datos
+-Cuantos grupos habrá
+-Cuantas sessiones por grupo habrá y cuantas horas por session tendrá cada uno
+
+
+por ejemplo: un curso de 5 horas se puede dividir en dos sessiones: 1 uno de 3 horas y otro de 2
+
+
+Cuando se tenga estos datos requeridos, se podrá asignar a fin. En que no se guardará estos datos 
+hasta sastifacer los datos puestos anteriormente en el calendario, estos datos que se tiene 
+sastifacer (grupos y sessiones), se verá en el panel de cursos pendientes que se verá el avancer.
+
+En por cada asignacion en el horario se tendrá que llenar los siguientes datos
+-y que salón se dará por cada session
+-CUANTOS ESTUDIANTES 
+-Que profesor enseñará cada grupo
+"
+ahora quisiera que me digas tus dudas antes de hacer algo o alguna sugerencia. No hagas nada todavía  
+
