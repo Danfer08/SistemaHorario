@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { LogOut, Home, Users, Briefcase, Calendar, BookOpen, Clock, ListChecks, Factory, BarChart } from 'lucide-react';
+import { LogOut, Home, Users, Briefcase, Calendar, BookOpen, Clock, ListChecks, Factory, BarChart, Loader } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { usePermissions } from '../hooks/usePermissions';
 
@@ -134,9 +134,10 @@ import CrearHorarioView from './crearHorario/CrearHorario';
 import GestionHorariosView from './crearHorario/GestionHorarios';
 import UsuariosView from './seguridad/Usuarios';
 import RolesView from './seguridad/Roles';
+import ViewVerhorario from './crearHorario/verHorario';
 
 // Componente de Contenido Principal (Content)
-const MainContent = ({ currentView, setCurrentView, user }) => {
+const MainContent = ({ currentView, setCurrentView, user, isViewLoading }) => {
     console.log('MainContent rendering view ->', currentView);
 
     let contentTitle = '';
@@ -144,6 +145,7 @@ const MainContent = ({ currentView, setCurrentView, user }) => {
 
     // Verificar si es una ruta con parámetros como "crear-horario/123"
     const isCrearHorarioWithId = currentView.startsWith('crear-horario/');
+    const isVerHorarioWithId = currentView.startsWith('ver-horario/');
 
     switch(true) {
         case currentView === 'horarios':
@@ -175,6 +177,14 @@ const MainContent = ({ currentView, setCurrentView, user }) => {
             contentTitle = horarioId ? 'Edición de Horario' : 'Crear Horario';
             content = <CrearHorarioView horarioId={horarioId} />;
             break;
+        case isVerHorarioWithId:
+            const horarioId_ver = currentView.split('/')[1];
+            contentTitle = 'Ver horario';
+            content = <ViewVerhorario horarioId={horarioId_ver} />;
+        case currentView === 'ver-horario':
+            contentTitle = 'Ver Horario';
+            content = <ViewVerhorario />;
+            break;
         case currentView === 'crear-horario':
             contentTitle = 'Crear Horario';
             content = <CrearHorarioView />;
@@ -197,10 +207,23 @@ const MainContent = ({ currentView, setCurrentView, user }) => {
     }
 
     return (
-        <main className="flex-grow overflow-auto bg-white">
+        <main className="flex-grow overflow-auto bg-white relative">
+            {/* --- INICIO: INDICADOR DE CARGA GLOBAL --- */}
+            {isViewLoading && (
+                <div className="absolute inset-0 bg-white bg-opacity-75 flex items-center justify-center z-50">
+                    <div className="flex flex-col items-center">
+                        <Loader className="w-12 h-12 text-blue-600 animate-spin" />
+                        <p className="mt-4 text-lg text-gray-700">Cargando vista...</p>
+                    </div>
+                </div>
+            )}
+            {/* --- FIN: INDICADOR DE CARGA GLOBAL --- */}
+
             <div className="p-6">
-                <h1 className="text-3xl font-extrabold text-gray-800 mb-4">{contentTitle}</h1>
-                {content}
+                <div style={{ visibility: isViewLoading ? 'hidden' : 'visible' }}>
+                    <h1 className="text-3xl font-extrabold text-gray-800 mb-4">{contentTitle}</h1>
+                    {content}
+                </div>
             </div>
         </main>
     );
@@ -210,6 +233,21 @@ const MainContent = ({ currentView, setCurrentView, user }) => {
 const Dashboard = () => {
     const { user, isLoading, logout } = useAuth();
     const [currentView, setCurrentView] = useState('horarios');
+    const [isViewLoading, setIsViewLoading] = useState(false);
+
+    // Nueva función para manejar el cambio de vista con un estado de carga
+    const handleSetCurrentView = (newView) => {
+        if (newView === currentView) return; // No hacer nada si es la misma vista
+
+        setIsViewLoading(true);
+
+        // Pequeño timeout para permitir que el loader se muestre antes de que el nuevo componente empiece a renderizar
+        setTimeout(() => {
+            setCurrentView(newView);
+            // Desactivar el loader después de que el cambio de estado se propague
+            setTimeout(() => setIsViewLoading(false), 150); // Ajusta este tiempo si es necesario
+        }, 50);
+    };
 
     if (isLoading) {
         return (
@@ -241,7 +279,7 @@ const Dashboard = () => {
             {/* Sidebar */}
             <Sidebar 
                 currentView={currentView} 
-                setCurrentView={setCurrentView} 
+                setCurrentView={handleSetCurrentView} 
                 logout={logout}
                 user={user}
             />
@@ -249,8 +287,9 @@ const Dashboard = () => {
             {/* Main Content */}
             <MainContent 
                 currentView={currentView}
-                setCurrentView={setCurrentView}
+                setCurrentView={handleSetCurrentView}
                 user={user}
+                isViewLoading={isViewLoading}
             />
         </div>
     );

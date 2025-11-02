@@ -17,7 +17,7 @@ const MiHorarioView = () => {
     totalEstudiantes: 0
   });
 
-  const dias = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+  const dias = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado']; // Sábado incluido
   const horas = ['07:00', '08:00', '09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00', '18:00','19:00','20:00','21:00','22:00','23:00'];
 
   // Configurar axios con token de autenticación
@@ -117,13 +117,12 @@ const MiHorarioView = () => {
 
   const calcularStats = (horarios) => {
     const cargaActual = horarios.reduce((sum, h) => {
-      const horas = h.hora.split('-');
-      const inicio = parseInt(horas[0].split(':')[0]);
-      const fin = parseInt(horas[1].split(':')[0]);
-      return sum + (fin - inicio);
+      const inicio = parseInt(h.hora.split(':')[0]);
+      const fin = parseInt(h.hora_fin.split(':')[0]);
+      return sum + (fin - inicio); // Suma las horas de cada sesión
     }, 0);
 
-    const totalSecciones = horarios.length;
+    const totalSecciones = [...new Set(horarios.map(h => h.horario_curso_id))].length;
     const totalEstudiantes = horarios.reduce((sum, h) => sum + h.estudiantes, 0);
 
     setStats({
@@ -133,6 +132,26 @@ const MiHorarioView = () => {
       totalEstudiantes
     });
   };
+
+  const getDuracionEnHoras = (horaInicio, horaFin) => {
+    if (!horaInicio || !horaFin) return 1;
+    const [h1] = horaInicio.split(':').map(Number);
+    const [h2] = horaFin.split(':').map(Number);
+    return Math.max(1, h2 - h1);
+  };
+
+  const horarioProcesado = React.useMemo(() => {
+    const grid = {};
+    horarioData.forEach(clase => {
+      const duracion = getDuracionEnHoras(clase.hora, clase.hora_fin);
+      const horaInicioNum = parseInt(clase.hora.split(':')[0], 10);
+      for (let i = 0; i < duracion; i++) {
+        const horaActual = `${(horaInicioNum + i).toString().padStart(2, '0')}:00`;
+        grid[`${clase.dia}-${horaActual}`] = { ...clase, isStart: i === 0 };
+      }
+    });
+    return grid;
+  }, [horarioData]);
 
   const exportarPDF = () => {
     // Implementar exportación a PDF
@@ -296,19 +315,18 @@ const MiHorarioView = () => {
                   {hora}
                 </div>
                 {dias.map(dia => {
-                  const clase = horarioData.find(h => 
-                    h.dia === dia && h.hora.startsWith(hora.slice(0, 2))
-                  );
+                  const key = `${dia}-${hora}`;
+                  const clase = horarioProcesado[key];
                   return (
                     <div 
                       key={`${dia}-${hora}`} 
                       className={`p-3 rounded-lg border-2 min-h-[80px] ${
                         clase 
-                          ? 'bg-blue-100 border-blue-300 cursor-pointer hover:bg-blue-200 transition' 
+                          ? `bg-blue-100 border-blue-300 cursor-pointer hover:bg-blue-200 transition ${!clase.isStart ? 'border-t-0 rounded-t-none' : ''}`
                           : 'bg-gray-50 border-gray-200'
                       }`}
                     >
-                      {clase && (
+                      {clase && clase.isStart && (
                         <div className="text-xs">
                           <div className="font-bold text-blue-900 mb-1">{clase.curso}</div>
                           <div className="text-gray-700">Grupo {clase.grupo}</div>
@@ -353,4 +371,3 @@ const MiHorarioView = () => {
 };
 
 export default MiHorarioView;
-

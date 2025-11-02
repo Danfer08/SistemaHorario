@@ -16,6 +16,7 @@ const ModalAsignacion = ({
   const [salonId, setSalonId] = useState('');
   const [grupo, setGrupo] = useState('1');
   const [estudiantes, setEstudiantes] = useState('');
+  const [sesionesPorSemana, setSesionesPorSemana] = useState(1);
 
   useEffect(() => {
     // Resetear estado cuando el modal se abre
@@ -23,10 +24,11 @@ const ModalAsignacion = ({
     setSalonId('');
     setGrupo('1');
     setEstudiantes('');
+    setSesionesPorSemana(1);
   }, [cursoModal]);
 
   const handleSubmit = () => {
-    if (!profesorId || !salonId || !grupo || !estudiantes) {
+    if (!profesorId || !salonId || !grupo || !estudiantes || !sesionesPorSemana) {
       alert('Por favor complete todos los campos');
       return;
     }
@@ -34,7 +36,7 @@ const ModalAsignacion = ({
     const profesorSeleccionado = profesores.find(p => p.idProfesor === parseInt(profesorId));
     const salonSeleccionado = salones.find(s => s.idSalon === parseInt(salonId));
     
-    handleAsignarCurso(profesorSeleccionado, salonSeleccionado, grupo, parseInt(estudiantes));
+    handleAsignarCurso(profesorSeleccionado, salonSeleccionado, grupo, parseInt(estudiantes), sesionesPorSemana);
   };
 
   return (
@@ -105,6 +107,18 @@ const ModalAsignacion = ({
             />
           </div>
 
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Sesiones por Semana</label>
+            <input 
+              type="number" 
+              value={sesionesPorSemana}
+              onChange={(e) => setSesionesPorSemana(parseInt(e.target.value, 10))}
+              className="w-full px-4 py-2 border border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-500 text-black"
+              placeholder="Ej: 3"
+              min="1"
+              max="5" // Lunes a Viernes
+            />
+          </div>
           <div className="flex gap-3 pt-4">
             <button
               onClick={handleSubmit}

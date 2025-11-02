@@ -8,6 +8,7 @@ use App\Models\DetalleHorarioCurso;
 use App\Services\HorarioValidationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class HorarioController extends Controller
 {
@@ -97,8 +98,10 @@ class HorarioController extends Controller
         }
     }
 
+    #region AsignarCurso 💩
     public function asignarCurso(Request $request)
     {
+        log::info("ControlerAsignarCurso: Iniciado");
         $request->validate([
             'curso_id' => 'required|exists:curso,idCurso',
             'profesor_id' => 'required|exists:profesor,idProfesor',
@@ -113,49 +116,71 @@ class HorarioController extends Controller
 
         try {
             $payload = $request->all();
-            $detallePayload = $payload['detalles'][0]; // Asumimos una sesión por asignación desde el modal
+            $allConflictos = [];
 
-            $dataValidacion = [
-                'FK_idProfesor' => $payload['profesor_id'],
-                'FK_idCurso' => $payload['curso_id'],
-                'FK_idSalon' => $detallePayload['salon_id'],
-                'dia' => $detallePayload['dia'],
-                'Hora_inicio' => $detallePayload['hora_inicio'] . ':00',
-                'Hora_fin' => $detallePayload['hora_fin'] . ':00',
-                'Nr_estudiantes' => $payload['estudiantes'],
-            ];
+            log::info("ControlerAsignarCurso: Validar conflictos para cada detalle");
+            // Validar conflictos para cada detalle
+            foreach ($payload['detalles'] as $detalle) {
+                $dataValidacion = [
+                    'FK_idProfesor' => $payload['profesor_id'],
+                    'FK_idCurso' => $payload['curso_id'],
+                    'FK_idSalon' => $detalle['salon_id'],
+                    'dia' => $detalle['dia'],
+                    'Hora_inicio' => $detalle['hora_inicio'] . ':00',
+                    'Hora_fin' => $detalle['hora_fin'] . ':00',
+                    'Nr_estudiantes' => $payload['estudiantes'],
+                ];
+                $conflictos = $this->validationService->validarTodoConflictos($dataValidacion);
+                if (!empty($conflictos)) {
+                    $allConflictos = array_merge($allConflictos, $conflictos);
+                }
+            }
 
-            // Validar conflictos
-            $conflictos = $this->validationService->validarTodoConflictos($dataValidacion);
-            if (!empty($conflictos)) {
-                return response()->json(['message' => 'Conflictos detectados', 'conflictos' => $conflictos], 422);
+            if (!empty($allConflictos)) {
+                return response()->json(['message' => 'Conflictos detectados', 'conflictos' => $allConflictos], 422);
             }
 
             DB::beginTransaction();
 
+            log::info("ControlerAsignarCurso: antes de crear HorarioCurso");
+
             $horarioCurso = HorarioCurso::create([
                 'FK_idHorario' => (int)$request->route('id'),
-                'FK_idProfesor' => $payload['profesor_id'],
-                'FK_idCurso' => $payload['curso_id'],
+                'FK_idProfesor' => $payload['profesor_id'], // Asegúrate de que estos campos existan en la tabla
+                'FK_idCurso' => $payload['curso_id'], // y en el modelo
                 'tipo' => $payload['tipo'] ?? 'regular', // 'regular' por defecto
                 'Grupo' => $payload['grupo'],
                 'Nr_estudiantes' => $payload['estudiantes']
             ]);
 
-            $detalleCreado = DetalleHorarioCurso::create([
-                'FK_idHorarioCurso' => $horarioCurso->idHorarioCurso,
-                'FK_idSalon' => $detallePayload['salon_id'],
-                'dia' => $detallePayload['dia'],
-                'Hora_inicio' => $dataValidacion['Hora_inicio'],
-                'Hora_fin' => $dataValidacion['Hora_fin']
-            ]);
+            log::info("Creando Detalles de cada Curso, pero antes info");
+
+            log::info("HorarioCurso creado con ID: " . $horarioCurso->idHorarioCurso);
+
+            foreach ($payload['detalles'] as $detalle){
+                log::info("Detalle - Día: " . $detalle['dia'] . ", Hora Inicio: " . $detalle['hora_inicio'] . ", Hora Fin: " . $detalle['hora_fin'] . ", Salon ID: " . $detalle['salon_id']);
+            }
+            
+
+            $detallesCreados = [];
+            foreach ($payload['detalles'] as $detalle) {
+                $detallesCreados[] = DetalleHorarioCurso::create([
+                    'FK_idHorarioCurso' => $horarioCurso->idHorarioCurso,
+                    'FK_idSalon' => $detalle['salon_id'],
+                    'dia' => $detalle['dia'],
+                    'Hora_inicio' => $detalle['hora_inicio'] . ':00',
+                    'Hora_fin' => $detalle['hora_fin'] . ':00'
+                ]);
+            }
+
+            log::info("Terminado Detalles de cada Curso");
 
             DB::commit();
             return response()->json([
                 'message' => 'Curso asignado con éxito',
                 'data' => [
                     'horarioCurso' => $horarioCurso,
-                    'detalle' => $detalleCreado
+                    'detalles' => $detallesCreados
                 ]
             ], 201);
 
@@ -164,6 +189,9 @@ class HorarioController extends Controller
             return response()->json(['message' => 'Error al asignar el curso', 'error' => $e->getMessage()], 500);
         }
     }
+
+
+    #region confirmarHo
     public function confirmarHorario($id)
     {
         try {
@@ -231,16 +259,19 @@ class HorarioController extends Controller
             ->get()
             ->map(function ($d) {
                 return [
-                    'id' => $d->horarioCurso->idHorarioCurso,
+                    'id' => $d->idDetalle_Horario_Curso, // ID del detalle
+                    'horario_curso_id' => $d->horarioCurso->idHorarioCurso, // ID de la asignación padre
                     'curso' => $d->horarioCurso->curso->nombre,
+                    'curso_id' => $d->horarioCurso->curso->idCurso,
                     'profesor' => optional($d->horarioCurso->profesor)->nombre . ' ' . optional($d->horarioCurso->profesor)->apellido,
                     'profesor_id' => optional($d->horarioCurso->profesor)->idProfesor,
-                    'salon' => 'SL-' . $d->salon->idSalon,
+                    'salon' => $d->salon->codigo,
                     'salon_id' => $d->salon->idSalon,
                     'grupo' => $d->horarioCurso->Grupo,
                     'estudiantes' => $d->horarioCurso->Nr_estudiantes,
                     'dia' => $d->dia,
-                    'hora' => substr($d->Hora_inicio, 0, 5) . '-' . substr($d->Hora_fin, 0, 5),
+                    'hora' => substr($d->Hora_inicio, 0, 5),
+                    'hora_fin' => substr($d->Hora_fin, 0, 5)
                 ];
             });
 

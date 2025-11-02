@@ -32,17 +32,20 @@ const GestionHorariosView = ({ setCurrentView }) => {
       const response = await axios.post('/api/horarios', newHorarioData);
       const nuevoHorario = response.data.data;
       setShowCreateModal(false);
-      // Redirigir a la vista de edición con el ID del nuevo horario
+      // Usar la función del dashboard para cambiar de vista
       setCurrentView(`crear-horario/${nuevoHorario.idHorario}`);
     } catch (err) {
       alert('Error al crear el horario. Verifique que no exista ya un borrador para ese período.');
       console.error(err);
     }
   };
-
+  
   const handleEdit = (horario) => {
     if (horario.estado === 'borrador') {
       setCurrentView(`crear-horario/${horario.idHorario}`);
+    }
+    else if (horario.estado === 'confirmado'){
+        setCurrentView(`ver-horario/${horario.idHorario}`);
     }
   };
 
@@ -99,7 +102,6 @@ const GestionHorariosView = ({ setCurrentView }) => {
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                     <button
                       onClick={() => handleEdit(horario)}
-                      disabled={horario.estado !== 'borrador'}
                       className="text-blue-600 hover:text-blue-900 disabled:text-gray-400 disabled:cursor-not-allowed flex items-center gap-1"
                     >
                       {horario.estado === 'borrador' ? <Edit size={16} /> : <Eye size={16} />}

@@ -71,33 +71,39 @@ export const useHorario = (horarioId) => {
       const horario = response.data.data;
       setHorarioActual(horario);
       setSelectedPeriodo({ año: horario.año, etapa: horario.etapa });
-      cargarHorarioGrid(id);
+      const cicloInicial = horario.etapa === 'II' ? '2' : '1';
+      setSelectedCiclo(cicloInicial);
+
+      cargarHorarioGrid(id, cicloInicial); // Pasar el ciclo directamente
     } catch (error) {
       console.error('Error al cargar el horario:', error);
       setError('Error al cargar el horario. Puede que no exista.');
     }
   };
 
-  const cargarHorarioGrid = async (horarioId) => {
+  const cargarHorarioGrid = async (horarioId, ciclo = selectedCiclo) => {
     try {
       const response = await axios.get(`/api/horarios/${horarioId}/grid`, {
         params: {
-          ciclo: selectedCiclo
+          ciclo: ciclo // Usar el ciclo pasado como parámetro o el del estado
         }
       });
 
       const gridData = {};
       response.data.data.forEach(item => {
         const key = `${item.dia}-${item.hora.split('-')[0]}`;
+        // El ID de la asignación (horario_curso_id) se usará para agrupar
         gridData[key] = {
-          id: item.id,
+          id: item.horario_curso_id, 
+          idCurso: item.curso_id,
           nombre: item.curso,
           profesor: { id: item.profesor_id, nombre: item.profesor },
-          salon: { id: item.salon_id, codigo: item.salon },
+          salon: { id: item.salon_id},
           grupo: item.grupo,
           estudiantes: item.estudiantes,
           dia: item.dia,
-          hora: item.hora.split('-')[0]
+          hora: item.hora,
+          hora_fin: item.hora_fin // Añadir hora_fin a los datos del grid
         };
       });
 
@@ -174,46 +180,62 @@ export const useHorario = (horarioId) => {
     }
   };
 
-  const handleAsignarCurso = async (profesor, salon, grupo, estudiantes) => {
+  const handleAsignarCurso = async (profesor, salon, grupo, estudiantes, sesionesPorSemana) => {
+    const diasSemana = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes'];
+    const diaInicioIndex = diasSemana.indexOf(cursoModal.dia);
+
+    if (diaInicioIndex === -1) {
+      setError("Día de inicio no válido.");
+      return;
+    }
+
+    const detalles = [];
+    for (let i = 0; i < sesionesPorSemana; i++) {
+      const diaIndex = (diaInicioIndex + i) % diasSemana.length;
+      const dia = diasSemana[diaIndex];
+      
+      // Validar que la nueva celda no esté ocupada
+      const key = `${dia}-${cursoModal.hora}`;
+      if (horarioGrid[key]) {
+        setError(`La celda para ${dia} a las ${cursoModal.hora} ya está ocupada.`);
+        return; // Detener si una de las celdas futuras está ocupada
+      }
+
+      detalles.push({
+        dia: dia,
+        hora_inicio: cursoModal.hora,
+        hora_fin: calcularHoraFin(cursoModal.hora, cursoModal.horas_totales / sesionesPorSemana),
+        salon_id: salon.idSalon
+      });
+    }
+
     try {
       const response = await axios.post(`/api/horarios/${horarioId}/asignar-curso`, {
         curso_id: cursoModal.idCurso,
         profesor_id: profesor.idProfesor,
         grupo: grupo,
         estudiantes: estudiantes,
-        detalles: [{
-          dia: cursoModal.dia,
-          hora_inicio: cursoModal.hora,
-          hora_fin: calcularHoraFin(cursoModal.hora, cursoModal.horas_totales),
-          salon_id: salon.idSalon
-        }]
+        detalles: detalles
       });
       
-      const newAsignacion = response.data.data.horarioCurso;
-      
-      const newGrid = {
-        ...horarioGrid,
-        [cursoModal.key]: {
-          ...cursoModal,
-          id: newAsignacion.idHorarioCurso, // ID real de la asignación
-          profesor,
-          salon,
-          grupo,
-          estudiantes
-        }
-      };
-      
-      setHorarioGrid(newGrid);
+      // Recargar el grid para mostrar todas las nuevas sesiones
+      await cargarHorarioGrid(horarioId);
+
       setShowModal(false);
       setCursoModal(null);
       await validarConflictos();
     } catch (error) {
       console.error('Error al asignar curso:', error);
-      setError('Error al asignar el curso');
+      if (error.response?.data?.conflictos) {
+        setConflictos(error.response.data.conflictos);
+        setError('No se puede asignar el curso porque genera conflictos.');
+      } else {
+        setError('Error al asignar el curso. ' + (error.response?.data?.message || ''));
+      }
     }
   };
 
-  const cursosAsignados = Object.values(horarioGrid).map(c => c.idCurso);
+  const cursosAsignados = Object.values(horarioGrid).map(c => c.idCurso); // Esto podría necesitar ajuste para contar por horario_curso_id
   const cursosPendientes = cursosDisponibles.filter(c => !cursosAsignados.includes(c.idCurso));
 
   return {

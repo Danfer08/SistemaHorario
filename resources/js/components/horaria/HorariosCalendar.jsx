@@ -14,7 +14,7 @@ const HorariosView = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [horariosDisponibles, setHorariosDisponibles] = useState([]);
-
+  
   const horas = ['07:00', '08:00', '09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00', '18:00'];
   const dias = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
 
@@ -40,7 +40,10 @@ const HorariosView = () => {
 
   const cargarHorariosDisponibles = async () => {
     try {
-      const response = await apiClient.get('/horarios');
+      const response = await apiClient.get('api/horarios');
+      console.log('Horarios disponibles cargados:', response.data.data);
+      console.log('Respuesta completa:', response);
+
       setHorariosDisponibles(response.data.data);
     } catch (error) {
       console.error('Error al cargar horarios:', error);
@@ -65,12 +68,14 @@ const HorariosView = () => {
       }
 
       // Obtener datos del grid del horario
-      const response = await api.get(`/horarios/${horarioEncontrado.idHorario}/grid`, {
+      const response = await apiClient.get(`/api/horarios/${horarioEncontrado.idHorario}/grid`, {
         params: {
           ciclo: filters.ciclo,
           grupo: filters.grupo
         }
       });
+
+      console.log('Datos del horario cargados:', response.data.data);
 
       setHorarioData(response.data.data);
     } catch (error) {
@@ -89,6 +94,26 @@ const HorariosView = () => {
     // Implementar exportación a PDF
     alert('Función de exportación a PDF en desarrollo');
   };
+
+  const getDuracionEnHoras = (horaInicio, horaFin) => {
+    if (!horaInicio || !horaFin) return 1;
+    const [h1] = horaInicio.split(':').map(Number);
+    const [h2] = horaFin.split(':').map(Number);
+    return Math.max(1, h2 - h1);
+  };
+
+  const horarioProcesado = React.useMemo(() => {
+    const grid = {};
+    horarioData.forEach(clase => {
+      const duracion = getDuracionEnHoras(clase.hora, clase.hora_fin);
+      const horaInicioNum = parseInt(clase.hora.split(':')[0], 10);
+      for (let i = 0; i < duracion; i++) {
+        const horaActual = `${(horaInicioNum + i).toString().padStart(2, '0')}:00`;
+        grid[`${clase.dia}-${horaActual}`] = { ...clase, isStart: i === 0 };
+      }
+    });
+    return grid;
+  }, [horarioData]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-white p-6">
@@ -222,19 +247,18 @@ const HorariosView = () => {
                   {hora}
                 </div>
                 {dias.map(dia => {
-                  const clase = horarioData.find(h => 
-                    h.dia === dia && h.hora.startsWith(hora.slice(0, 2))
-                  );
+                  const key = `${dia}-${hora}`;
+                  const clase = horarioProcesado[key];
                   return (
                     <div 
                       key={`${dia}-${hora}`} 
                       className={`p-3 rounded-lg border-2 min-h-[80px] ${
                         clase 
-                          ? 'bg-blue-100 border-blue-300 cursor-pointer hover:bg-blue-200 transition' 
+                          ? `bg-blue-100 border-blue-300 cursor-pointer hover:bg-blue-200 transition ${!clase.isStart ? 'border-t-0 rounded-t-none' : ''}`
                           : 'bg-gray-50 border-gray-200'
                       }`}
                     >
-                      {clase && (
+                      {clase && clase.isStart && (
                         <div className="text-xs">
                           <div className="font-bold text-blue-900 mb-1">{clase.curso}</div>
                           <div className="text-gray-700">{clase.profesor}</div>

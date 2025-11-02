@@ -24,7 +24,9 @@ const Alertas = ({ error, conflictos }) => {
               <h3 className="font-semibold text-red-900 mb-2">⚠️ Conflictos Detectados ({conflictos.length})</h3>
               <ul className="space-y-1">
                 {conflictos.map((conf, idx) => (
-                  <li key={idx} className="text-sm text-red-700">• {conf.mensaje}</li>
+                  <li key={idx} className="text-sm text-red-700">
+                    • {typeof conf === 'object' && conf.mensaje ? conf.mensaje : conf}
+                  </li>
                 ))}
               </ul>
             </div>

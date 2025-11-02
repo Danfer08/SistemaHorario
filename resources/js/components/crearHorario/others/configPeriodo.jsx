@@ -1,7 +1,17 @@
 // components/ConfiguracionPeriodo.js
-import React from 'react';
+import React, { useEffect } from 'react';
 
 const ConfiguracionPeriodo = ({ selectedPeriodo, setSelectedPeriodo, selectedCiclo, setSelectedCiclo, isEditing = false }) => {
+  
+  // **SOLUCIÓN: Sincronizar el ciclo cuando cambia la etapa**
+  useEffect(() => {
+    if (selectedPeriodo.etapa === 'I' && parseInt(selectedCiclo) % 2 === 0) {
+      setSelectedCiclo('1'); // Si es Etapa I, el ciclo debe ser impar
+    } else if (selectedPeriodo.etapa === 'II' && parseInt(selectedCiclo) % 2 !== 0) {
+      setSelectedCiclo('2'); // Si es Etapa II, el ciclo debe ser par
+    }
+  }, [selectedPeriodo.etapa]);
+
   return (
     <div className="bg-white rounded-xl shadow-md p-6 mb-6">
       <h2 className="text-lg font-semibold text-gray-800 mb-4">Configuración del Periodo</h2>
