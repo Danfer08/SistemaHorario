@@ -1,0 +1,21 @@
+meta {
+  name: asignarCurso
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{route_sis}}/api/horarios/1/asignar-curso
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: Bearer {{access_token}}
+}
+
+body:json {
+  {
+    
+  }
+}

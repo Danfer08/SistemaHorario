@@ -1,0 +1,15 @@
+meta {
+  name: SalonesList
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{route_sis}}/api/salones
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: Bearer {{access_token}}
+}

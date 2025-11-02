@@ -1,0 +1,23 @@
+meta {
+  name: auth_login
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{route_sis}}/api/login
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "email":"picolo@unap.edu.pe",
+    "password":"12345678"
+  
+  }
+}
+
+vars:post-response {
+  access_token: res.body.token
+}

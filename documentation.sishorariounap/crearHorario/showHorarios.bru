@@ -1,0 +1,15 @@
+meta {
+  name: showHorarios
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{route_sis}}/api/horarios/1
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: Bearer {{access_token}}
+}

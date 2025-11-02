@@ -1,0 +1,81 @@
+// components/HorarioGrid.js
+import React from 'react';
+import { X } from 'lucide-react';
+import { dias, horas } from '../utils/horarioUtils';
+
+const HorarioGrid = ({ 
+  horarioGrid, 
+  handleDrop, 
+  handleEliminarAsignacion,
+  selectedCiclo,
+  selectedPeriodo 
+}) => {
+  return (
+    <div className="min-w-[900px]">
+      <div className="grid grid-cols-7 gap-2">
+        {/* Header */}
+        <div className="bg-blue-600 text-white p-3 rounded-lg font-semibold text-center text-sm">
+          Hora
+        </div>
+        {dias.map(dia => (
+          <div key={dia} className="bg-blue-600 text-white p-3 rounded-lg font-semibold text-center text-sm">
+            {dia}
+          </div>
+        ))}
+
+        {/* Grid Cells */}
+        {horas.map(hora => (
+          <React.Fragment key={hora}>
+            <div className="bg-blue-50 p-3 rounded-lg font-medium text-center text-gray-700 text-sm flex items-center justify-center">
+              {hora}
+            </div>
+            {dias.map(dia => {
+              const key = `${dia}-${hora}`;
+              const asignacion = horarioGrid[key];
+              
+              return (
+                <div
+                  key={key}
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={() => handleDrop(dia, hora)}
+                  className={`min-h-[90px] p-2 rounded-lg border-2 transition ${
+                    asignacion
+                      ? 'bg-gradient-to-br from-blue-100 to-blue-50 border-blue-400 shadow-sm'
+                      : 'bg-white border-dashed border-gray-300 hover:border-blue-400 hover:bg-blue-50'
+                  }`}
+                >
+                  {asignacion ? (
+                    <div className="relative">
+                      <button
+                        onClick={() => handleEliminarAsignacion(key)}
+                        className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-1 hover:bg-red-600"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                      <div className="text-xs">
+                        <p className="font-bold text-blue-900 mb-1">{asignacion.nombre}</p>
+                        <p className="text-gray-700">Grupo {asignacion.grupo}</p>
+                        {asignacion.profesor && (
+                          <p className="text-gray-600 truncate">{asignacion.profesor.nombre}</p>
+                        )}
+                        {asignacion.salon && (
+                          <p className="text-blue-600 font-medium">{asignacion.salon.codigo}</p>
+                        )}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="h-full flex items-center justify-center text-gray-400 text-xs">
+                      Arrastra aquí
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </React.Fragment>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+export default HorarioGrid;

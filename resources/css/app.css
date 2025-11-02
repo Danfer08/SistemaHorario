@@ -1,0 +1,6 @@
+@import "tailwindcss";
+
+/* Fuentes de contenido para Tailwind v4 */
+@source "./../views/**/*.blade.php";
+@source "./../js/**/*.js";
+@source "./../js/**/*.jsx";
