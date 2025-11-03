@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 use App\Http\Controllers\Controller;
 
 use App\Models\User;
+use App\Models\Profesor;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
@@ -144,7 +145,17 @@ class AuthController extends Controller
      */
     public function user(Request $request)
     {
+        try {
         $user = $request->user();
+
+        $roles = $user->getRoleNames();
+
+        if($roles->contains('profesor')){
+            $DataProfesor = Profesor::where('FK_user_id', $user->id)->first();
+        }else {
+            $DataProfesor = [];
+        }       
+
 
         return response()->json([
             'success' => true,
@@ -152,11 +163,23 @@ class AuthController extends Controller
                 'id' => $user->id,
                 'name' => $user->name,
                 'email' => $user->email,
-                'roles' => $user->getRoleNames(), // <-- AÑADIDO
+                'roles' => $user->getRoleNames(),
+                'profesor' => $DataProfesor,
                 'permissions' => $user->getAllPermissions()->pluck('name'), // <-- AÑADIDO
                 'created_at' => $user->created_at,
             ],
         ], 200);
+
+
+
+
+        } catch (\Exception $e) {
+            \Log::error('Error al obtener usuario autenticado: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Error interno del servidor' . $e->getMessage(),
+            ], 500);
+        }
     }
 
     /**

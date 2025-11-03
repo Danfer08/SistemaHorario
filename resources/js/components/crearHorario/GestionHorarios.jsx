@@ -1,8 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, Plus, Edit, Eye, Loader, AlertCircle } from 'lucide-react';
+import { Calendar, Plus, Edit, Eye, Loader, AlertCircle, Trash, Trash2 } from 'lucide-react';
 import axios from 'axios';
+import { useAcademicYears } from '../../utils/yearsHorario';
+
 
 const GestionHorariosView = ({ setCurrentView }) => {
+
+
+  const { years } = useAcademicYears();
   const [horarios, setHorarios] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -48,6 +53,22 @@ const GestionHorariosView = ({ setCurrentView }) => {
         setCurrentView(`ver-horario/${horario.idHorario}`);
     }
   };
+
+  const handleDelete = async (horario) => {
+    if (!window.confirm(`¿Está seguro de que desea eliminar el horario del año ${horario.año}, etapa ${horario.etapa}? Esta acción no se puede deshacer.`)) {
+      return;
+    }
+    try{
+      await axios.delete(`/api/horarios/${horario.idHorario}`);
+      alert('Horario eliminado exitosamente.');
+    }catch(error){
+      alert('Error al eliminar el horario. Intente de nuevo más tarde.');
+      console.error(error);
+      return;
+    }
+    fetchHorarios();
+
+  }
 
   const getStatusChip = (estado) => {
     switch (estado) {
@@ -107,6 +128,13 @@ const GestionHorariosView = ({ setCurrentView }) => {
                       {horario.estado === 'borrador' ? <Edit size={16} /> : <Eye size={16} />}
                       {horario.estado === 'borrador' ? 'Editar' : 'Ver'}
                     </button>
+                    <button
+                      onClick={() => handleDelete(horario)}
+                      className="text-blue-600 hover:text-blue-900 disabled:text-gray-400 disabled:cursor-not-allowed flex items-center gap-1"
+                    >
+                      <Trash2 size={16} />
+                      Eliminar
+                    </button>
                   </td>
                 </tr>
               ))}
@@ -116,19 +144,22 @@ const GestionHorariosView = ({ setCurrentView }) => {
       )}
 
       {showCreateModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-black-800 bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-md">
-            <h3 className="text-lg font-bold mb-4">Crear Nuevo Horario</h3>
+            <h3 className="text-lg font-bold mb-4 text-gray-800">Crear Nuevo Horario</h3>
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Año</label>
-                <select
+                <select 
+                  className="w-full px-4 py-2 border text-gray-900 border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
                   value={newHorarioData.año}
                   onChange={(e) => setNewHorarioData({ ...newHorarioData, año: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md"
                 >
-                  <option value="2025">2025</option>
-                  <option value="2024">2024</option>
+                  {years.map(year => (
+                    <option key={year} value={year.toString()}>
+                      {year}
+                    </option>
+                  ))}
                 </select>
               </div>
               <div>
@@ -136,7 +167,7 @@ const GestionHorariosView = ({ setCurrentView }) => {
                 <select
                   value={newHorarioData.etapa}
                   onChange={(e) => setNewHorarioData({ ...newHorarioData, etapa: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-gray-900"
                 >
                   <option value="I">I</option>
                   <option value="II">II</option>

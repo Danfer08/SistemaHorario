@@ -1,16 +1,31 @@
 // components/ConfiguracionPeriodo.js
 import React, { useEffect } from 'react';
+import { useAcademicYears } from '../../../utils/yearsHorario'; 
 
 const ConfiguracionPeriodo = ({ selectedPeriodo, setSelectedPeriodo, selectedCiclo, setSelectedCiclo, isEditing = false }) => {
   
   // **SOLUCIÓN: Sincronizar el ciclo cuando cambia la etapa**
+  
+  const { years } = useAcademicYears();
+  
   useEffect(() => {
-    if (selectedPeriodo.etapa === 'I' && parseInt(selectedCiclo) % 2 === 0) {
-      setSelectedCiclo('1'); // Si es Etapa I, el ciclo debe ser impar
-    } else if (selectedPeriodo.etapa === 'II' && parseInt(selectedCiclo) % 2 !== 0) {
-      setSelectedCiclo('2'); // Si es Etapa II, el ciclo debe ser par
+    // Solo sincronizar si el ciclo actual no es válido para la etapa seleccionada
+    const cicloNum = parseInt(selectedCiclo);
+    const esCicloImpar = cicloNum % 2 !== 0;
+    const esCicloPar = cicloNum % 2 === 0;
+    
+    if (selectedPeriodo.etapa === 'I' && esCicloPar) {
+      // Etapa I requiere ciclos impares, ajustar al ciclo impar más cercano
+      const nuevoCiclo = Math.max(1, cicloNum - 1);
+      setSelectedCiclo(nuevoCiclo.toString());
+    } else if (selectedPeriodo.etapa === 'II' && esCicloImpar) {
+      // Etapa II requiere ciclos pares, ajustar al ciclo par más cercano
+      const nuevoCiclo = cicloNum === 1 ? 2 : cicloNum + 1;
+      setSelectedCiclo(nuevoCiclo.toString());
     }
-  }, [selectedPeriodo.etapa]);
+  }, [selectedPeriodo.etapa, selectedCiclo]);
+
+  
 
   return (
     <div className="bg-white rounded-xl shadow-md p-6 mb-6">
@@ -18,14 +33,18 @@ const ConfiguracionPeriodo = ({ selectedPeriodo, setSelectedPeriodo, selectedCic
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">Año</label>
+          
           <select 
-            className="w-full px-4 py-2 border border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-500 text-black disabled:bg-gray-100"
-            value={selectedPeriodo.año}
-            onChange={(e) => setSelectedPeriodo({...selectedPeriodo, año: e.target.value})}
-            disabled={isEditing}
-          >
-            <option value="2025">2025</option>
-            <option value="2024">2024</option>
+                  className="w-full px-4 py-2 border border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-500 text-black disabled:bg-gray-100"
+                  value={selectedPeriodo.año}
+                  onChange={(e) => setSelectedPeriodo({...selectedPeriodo, año: e.target.value})}
+                  disabled={isEditing}
+                >
+                  {years.map(year => (
+                    <option key={year} value={year.toString()}>
+                      {year}
+                    </option>
+                  ))}
           </select>
         </div>
         <div>

@@ -18,7 +18,6 @@ const GestionUsuariosView = () => {
   const roles = [
     { id: 1, name: 'admin', permisos: 8 },
     { id: 2, name: 'profesor', permisos: 1 },
-    { id: 3, name: 'coordinador', permisos: 5 },
   ];
 
   const [formData, setFormData] = useState({

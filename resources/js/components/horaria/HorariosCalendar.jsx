@@ -1,21 +1,25 @@
 import React, { useState, useEffect } from 'react';
 import { Calendar, Filter, Download, Eye, Search, Loader } from 'lucide-react';
 import apiClient from '../../api/api';
+import { useAcademicYears } from '../../utils/yearsHorario';
 
 const HorariosView = () => {
+
+  const { years ,defaultYear } = useAcademicYears();
   const [filters, setFilters] = useState({
-    año: '2025',
+    año: defaultYear,
     etapa: 'I',
     ciclo: '1',
     grupo: '1'
   });
+
 
   const [horarioData, setHorarioData] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [horariosDisponibles, setHorariosDisponibles] = useState([]);
   
-  const horas = ['07:00', '08:00', '09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00', '18:00'];
+  const horas = ['07:00', '08:00', '09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00', '18:00', '19:00', '20:00', '21:00', '22:00', '23:00'];
   const dias = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
 
   // Configurar axios con token de autenticación
@@ -136,51 +140,43 @@ const HorariosView = () => {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Año</label>
+           
             <select 
-              className="w-full px-4 py-2 border border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              value={filters.año}
-              onChange={(e) => setFilters({...filters, año: e.target.value})}
-            >
-              <option value="2024">2024</option>
-              <option value="2025">2025</option>
-            </select>
+            className="w-full px-4 py-2 border text-gray-900 border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+            value={filters.año}
+            onChange={(e) => setFilters({...filters, año: e.target.value})}
+          >
+            {years.map(year => (
+              <option key={year} value={year.toString()}>
+                {year}
+              </option>
+            ))}
+          </select>
           </div>
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Etapa</label>
             <select 
-              className="w-full px-4 py-2 border border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full px-4 py-2 border border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
               value={filters.etapa}
               onChange={(e) => setFilters({...filters, etapa: e.target.value})}
             >
               <option value="I">I</option>
               <option value="II">II</option>
             </select>
+            
           </div>
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Ciclo</label>
             <select 
-              className="w-full px-4 py-2 border border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full px-4 py-2 border border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
               value={filters.ciclo}
               onChange={(e) => setFilters({...filters, ciclo: e.target.value})}
             >
               {[1,2,3,4,5,6,7,8,9,10].map(c => (
                 <option key={c} value={c}>{c}° Ciclo</option>
               ))}
-            </select>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Grupo</label>
-            <select 
-              className="w-full px-4 py-2 border border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              value={filters.grupo}
-              onChange={(e) => setFilters({...filters, grupo: e.target.value})}
-            >
-              <option value="1">Grupo 1</option>
-              <option value="2">Grupo 2</option>
-              <option value="3">Grupo 3</option>
             </select>
           </div>
         </div>

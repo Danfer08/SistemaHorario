@@ -74,10 +74,10 @@ class HorarioController extends Controller
             // Evitar duplicados en estado borrador
             $exists = Horario::where('año', $request->año)
                              ->where('etapa', $request->etapa)
-                             ->where('estado', 'borrador')
+                             ->where('estado', 'confirmado')
                              ->exists();
             if ($exists) {
-                return response()->json(['message' => 'Ya existe un horario en borrador para este período.'], 422);
+                return response()->json(['message' => 'Ya existe un horario confirmado del mismo período.'], 422);
             }
 
             $horario = Horario::create([
@@ -92,6 +92,38 @@ class HorarioController extends Controller
         } catch (\Exception $e) {
             DB::rollBack();
             return response()->json(['message' => 'Error al crear el horario', 'error' => $e->getMessage()], 500);
+        }
+    }
+
+    public function eliminarHorario($id)
+    {
+        try {
+            DB::beginTransaction();
+
+            $horario = Horario::findOrFail($id);
+
+            // Obtener IDs para eliminación eficiente
+            $horarioCursoIds = HorarioCurso::where('FK_idHorario', $id)
+                ->pluck('idHorarioCurso');
+
+            // Eliminar en lote
+            DetalleHorarioCurso::whereIn('FK_idHorarioCurso', $horarioCursoIds)->delete();
+            HorarioCurso::where('FK_idHorario', $id)->delete();
+            $horario->delete();
+
+            DB::commit();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Horario eliminado con éxito'
+            ]);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json([
+                'success' => false,
+                'message' => 'Error al eliminar el horario'
+            ], 500);
         }
     }
 

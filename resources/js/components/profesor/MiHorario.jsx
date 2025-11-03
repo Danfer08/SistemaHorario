@@ -1,8 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { Calendar, Clock, Users, BookOpen, Download, AlertCircle, CheckCircle, Loader } from 'lucide-react';
 import axios from 'axios';
+import { useAcademicYears } from '../../utils/yearsHorario';
 
 const MiHorarioView = () => {
+
+  const { years } = useAcademicYears();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [selectedPeriodo, setSelectedPeriodo] = useState({ año: '2025', etapa: 'I' });
@@ -201,20 +204,23 @@ const MiHorarioView = () => {
         <h2 className="text-lg font-semibold text-gray-800 mb-4">Período Académico</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Año</label>
-            <select 
-              className="w-full px-4 py-2 border border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-500"
-              value={selectedPeriodo.año}
-              onChange={(e) => setSelectedPeriodo({...selectedPeriodo, año: e.target.value})}
-            >
-              <option value="2025">2025</option>
-              <option value="2024">2024</option>
-            </select>
+              <label className="block text-sm font-medium text-gray-900 mb-2">Año</label>
+          <select 
+            className="w-full px-4 py-2 border text-gray-900 border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+            value={years.año}
+            onChange={(e) => !isReadOnly && setSelectedPeriodo({...selectedPeriodo, año: e.target.value})}
+          >
+            {years.map(year => (
+              <option key={year} value={year.toString()}>
+                {year}
+              </option>
+            ))}
+          </select>
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Etapa</label>
             <select 
-              className="w-full px-4 py-2 border border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-500"
+              className="w-full px-4 py-2 border text-gray-900 border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500"
               value={selectedPeriodo.etapa}
               onChange={(e) => setSelectedPeriodo({...selectedPeriodo, etapa: e.target.value})}
             >

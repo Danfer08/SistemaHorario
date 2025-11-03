@@ -28,6 +28,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/profesor/{profesorId}', [HorarioController::class, 'getHorarioProfesor']);
         Route::get('/ciclo/{ciclo}', [HorarioController::class, 'getHorarioCiclo']);
         Route::get('/{id}', [HorarioController::class, 'show']);
+        Route::delete('/{id}', [HorarioController::class, 'eliminarHorario']);
 
         // Endpoints usados por el front actual
         Route::get('/{id}/grid', [HorarioController::class, 'grid']);

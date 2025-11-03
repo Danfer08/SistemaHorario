@@ -181,6 +181,7 @@ const MainContent = ({ currentView, setCurrentView, user, isViewLoading }) => {
             const horarioId_ver = currentView.split('/')[1];
             contentTitle = 'Ver horario';
             content = <ViewVerhorario horarioId={horarioId_ver} />;
+            break;
         case currentView === 'ver-horario':
             contentTitle = 'Ver Horario';
             content = <ViewVerhorario />;

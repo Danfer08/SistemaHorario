@@ -80,6 +80,10 @@ export const useHorario = (horarioId) => {
       const horario = response.data.data;
       setHorarioActual(horario);
       setSelectedPeriodo({ año: horario.año, etapa: horario.etapa });
+      await cargarCursosPorCiclo();
+      await cargarHorarioGrid(horario.idHorario);
+
+
  // Actualizar el ciclo en la UI al final
     } catch (error) {
       console.error('Error al cargar el horario:', error);
