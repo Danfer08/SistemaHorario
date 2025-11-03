@@ -87,7 +87,7 @@ const HorarioGrid = ({
                           <p className="text-gray-600 truncate">{asignacion.profesor.nombre}</p>
                         )}
                         {asignacion.salon && (
-                          <p className="text-blue-600 font-medium">{asignacion.salon.codigo}</p>
+                          <p className="text-blue-600 font-medium">Salon: {asignacion.salon.id}</p>
                         )}
                       </div>
                     </div>

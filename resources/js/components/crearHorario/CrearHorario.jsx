@@ -1,14 +1,15 @@
 // views/CrearHorarioView.js
 import React from 'react';
-import { Clock, Save, CheckCircle, Loader } from 'lucide-react';
+import { Clock, CheckCircle, Loader, AlertTriangle } from 'lucide-react';
 
 // Hooks y componentes
 import { useHorario } from '../crearHorario/hook/horarioHooks';
-import ModalAsignacion from '../crearHorario/modalAssignHorario';
 import HorarioGrid from '../crearHorario/others/gridHorario';
 import PanelCursos from '../crearHorario/others/panelCursos';
 import ConfiguracionPeriodo from '../crearHorario/others/configPeriodo';
 import Alertas from '../crearHorario/others/alerts';
+import ModalPlanificadorGrupos from './ModalPlanificadorGrupos';
+import ModalAsignarSesion from './ModalAsignarSesion';
 
 const CrearHorarioView = ({ horarioId }) => {
   const {
@@ -19,23 +20,28 @@ const CrearHorarioView = ({ horarioId }) => {
     setSelectedCiclo,
     horarioGrid,
     conflictos,
-    showModal,
-    setShowModal,
-    cursoModal,
     loading,
     error,
     cursosPendientes,
-    cursosAsignados,
-    cursosDisponibles,
     profesores,
     salones,
-    
+    planificaciones,
+    showPlanificadorModal,
+    setShowPlanificadorModal,
+    cursoParaPlanificar,
+    showAsignarSesionModal,
+    setShowAsignarSesionModal,
+    sesionParaAsignar,
+    cursosAsignados,
+    cursosDisponibles,
     // Funciones
     handleDragStart,
     handleDrop,
     handleEliminarAsignacion,
-    handleAsignarCurso,
-    guardarHorario,
+    handleGuardarPlanificacion,
+    handleAbrirPlanificador,
+    handleAsignarSesion,    
+    validarConflictos,
     publicarHorario
   } = useHorario(horarioId);
 
@@ -66,11 +72,11 @@ const CrearHorarioView = ({ horarioId }) => {
           </div>
           <div className="flex gap-3">
             <button 
-              onClick={guardarHorario}
-              className="flex items-center gap-2 px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition"
+              onClick={validarConflictos}
+              className="flex items-center gap-2 px-4 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 transition"
             >
-              <Save className="w-4 h-4" />
-              Borrar Conflictos
+              <AlertTriangle className="w-4 h-4" />
+              Validar Conflictos
             </button>
             <button 
               onClick={publicarHorario}
@@ -98,11 +104,14 @@ const CrearHorarioView = ({ horarioId }) => {
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
         {/* Panel Lateral - Cursos Disponibles */}
-        <PanelCursos 
+        <PanelCursos
+          cursosAsignados={cursosAsignados} 
           cursosPendientes={cursosPendientes}
-          handleDragStart={handleDragStart}
-          cursosAsignados={cursosAsignados}
           cursosDisponibles={cursosDisponibles}
+          profesores={profesores}
+          planificaciones={planificaciones}
+          handleAbrirPlanificador={handleAbrirPlanificador}
+          handleDragStart={handleDragStart}
         />
 
         {/* Grid de Horario */}
@@ -123,14 +132,22 @@ const CrearHorarioView = ({ horarioId }) => {
         </div>
       </div>
 
-      {/* Modal de Asignación */}
-      <ModalAsignacion 
-        showModal={showModal}
-        setShowModal={setShowModal}
-        cursoModal={cursoModal}
+      {/* Modal para Planificar Grupos y Sesiones */}
+      <ModalPlanificadorGrupos
+        show={showPlanificadorModal}
+        onClose={() => setShowPlanificadorModal(false)}
+        curso={cursoParaPlanificar}
         profesores={profesores}
+        onSavePlanificacion={handleGuardarPlanificacion}
+      />
+
+      {/* Modal para Asignar Salón a una Sesión */}
+      <ModalAsignarSesion
+        show={showAsignarSesionModal}
+        onClose={() => setShowAsignarSesionModal(false)}
+        sesion={sesionParaAsignar}
         salones={salones}
-        handleAsignarCurso={handleAsignarCurso}
+        onAsignar={handleAsignarSesion}
       />
       </div>
     </div>

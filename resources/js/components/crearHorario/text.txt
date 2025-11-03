@@ -43,3 +43,57 @@ En por cada asignacion en el horario se tendrá que llenar los siguientes datos
 "
 ahora quisiera que me digas tus dudas antes de hacer algo o alguna sugerencia. No hagas nada todavía  
 
+1. Si deber haber un nuevo modal para planificar los grupos y sessiones. Puedes crear otro archivo para este proposito 
+
+2. Si, por cada grupo habrá un profesor, las asignacioens que tenga será con el mismo profesor, y tendrá la misma cantidad de estudiantes.
+por ejemplo:
+Grupo 1 tiene 20 estudiantes y tiene como profesor a Thomas
+en que tiene sessioens el lune de 7 a 9 y el martes de 18:00 al 20:00
+
+3.  Si exactamente, total de horas de sessiones por grupo deber ser el horas_totales
+
+Cada grupo debe cumpolir con la carga horaria total del curso
+
+
+4. Haz la interfaz lo menos complejo, en que puedes envolverte más en la lógica de funcionamiento.
+el desarrollo de una interfaz más limpia y dinamica se puede hacer despues. ahora lo principal es el funcionamiento.
+
+5. Si es exactamente como debería ser usada la base de datos actualmente.
+En que las tablas son las siguientes:
+
+
+Tabla 1: horario
+sql
+
+idHorario (PK)
+año (ej: 2025)
+etapa (ej: I, II)
+fecha (timestamp)
+estado (borrador, publicado)
+
+Tabla 2: horario_curso
+sql
+
+idHorarioCurso (PK)
+FK_idProfesor
+FK_idCurso
+tipo (regular, irregular)
+FK_idHorario
+Grupo (1, 2, 3)
+Nr_estudiantes
+
+Tabla 3: detalle_horario_curso
+sql
+
+idDetalle_Horario_Curso (PK)
+FK_idHorarioCurso
+FK_idSalon
+dia (Lunes, Martes, ...)
+Hora_inicio (HH:MM)
+Hora_fin (HH:MM)
+
+
+Se necesita una forma de almacenar la infroamción de planificación antes que se guarde en el calendario.
+
+
+

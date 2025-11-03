@@ -21,7 +21,7 @@ const Alertas = ({ error, conflictos }) => {
           <div className="flex items-start gap-3">
             <AlertTriangle className="w-6 h-6 text-red-600 flex-shrink-0 mt-1" />
             <div className="flex-1">
-              <h3 className="font-semibold text-red-900 mb-2">⚠️ Conflictos Detectados ({conflictos.length})</h3>
+              <h3 className="font-semibold text-red-900 mb-2">⚠️ Detalles del Error ({conflictos.length})</h3>
               <ul className="space-y-1">
                 {conflictos.map((conf, idx) => (
                   <li key={idx} className="text-sm text-red-700">

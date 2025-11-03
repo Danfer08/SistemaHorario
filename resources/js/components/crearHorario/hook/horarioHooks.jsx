@@ -6,17 +6,22 @@ import { configurarAxios, calcularHoraFin } from '../utils/horarioUtils';
 export const useHorario = (horarioId) => {
   const [selectedPeriodo, setSelectedPeriodo] = useState({ año: '2025', etapa: 'I' });
   const [selectedCiclo, setSelectedCiclo] = useState('1');
-  const [draggedCurso, setDraggedCurso] = useState(null);
+  const [draggedItem, setDraggedItem] = useState(null);
   const [horarioGrid, setHorarioGrid] = useState({});
   const [conflictos, setConflictos] = useState([]);
-  const [showModal, setShowModal] = useState(false);
-  const [cursoModal, setCursoModal] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [cursosDisponibles, setCursosDisponibles] = useState([]);
   const [profesores, setProfesores] = useState([]);
   const [salones, setSalones] = useState([]);
   const [horarioActual, setHorarioActual] = useState(null);
+  
+  // Estados para el nuevo flujo de planificación
+  const [planificaciones, setPlanificaciones] = useState({}); // Almacena los grupos y sesiones planificados
+  const [showPlanificadorModal, setShowPlanificadorModal] = useState(false);
+  const [cursoParaPlanificar, setCursoParaPlanificar] = useState(null);
+  const [showAsignarSesionModal, setShowAsignarSesionModal] = useState(false);
+  const [sesionParaAsignar, setSesionParaAsignar] = useState(null);
 
   // Configurar axios
   useEffect(() => {
@@ -116,22 +121,26 @@ export const useHorario = (horarioId) => {
     }
   };
 
-  const handleDragStart = (curso) => {
-    setDraggedCurso(curso);
+  const handleDragStart = (item, type, sesion = null) => {
+    // El drag and drop ahora solo funciona para sesiones planificadas
+    if (type !== 'sesion' || !sesion) return;
+    setDraggedItem({ ...item, type, sesion });
   };
+  
 
   const handleDrop = (dia, hora) => {
-    if (!draggedCurso) return;
+    if (!draggedItem || draggedItem.type !== 'sesion') return;
 
     const key = `${dia}-${hora}`;
     
     if (horarioGrid[key]) {
-      alert('Ya hay un curso asignado en este horario');
+      alert('Ya hay una sesión asignada en este horario');
       return;
     }
 
-    setCursoModal({ ...draggedCurso, dia, hora, key });
-    setShowModal(true);
+    const hora_fin = calcularHoraFin(hora, draggedItem.duracion);
+    setSesionParaAsignar({ ...draggedItem, dia, hora_inicio: hora, hora_fin });
+    setShowAsignarSesionModal(true);
   };
 
   const handleEliminarAsignacion = async (key) => {
@@ -140,12 +149,29 @@ export const useHorario = (horarioId) => {
 
     try {
       await axios.delete(`/api/horarios/${horarioActual.idHorario}/eliminar-asignacion`, {
+        // Se elimina por horario_curso_id, que agrupa todas las sesiones de un grupo
         data: { horario_curso_id: asignacion.id }
       });
 
-      const newGrid = { ...horarioGrid };
-      delete newGrid[key];
-      setHorarioGrid(newGrid);
+      // Recargar el grid para reflejar la eliminación
+      await cargarHorarioGrid(horarioActual.idHorario);
+
+      // Optimización: En lugar de una lógica compleja, simplemente recargamos los cursos.
+      // Esto asegura que el curso eliminado vuelva a la lista de "pendientes" si ya no tiene grupos en el horario.
+      // La lógica para determinar `cursosPendientes` ya se encarga de esto.
+      await cargarCursosPorCiclo();
+
+      // Limpiar las planificaciones para el curso si ya no tiene grupos asignados.
+      // Esto es una optimización para que el panel de cursos se actualice correctamente.
+      setPlanificaciones(prev => {
+          const cursoIdEliminado = asignacion.idCurso.toString();
+          const nuevasPlanificaciones = { ...prev };
+          // Si después de la recarga del grid, ya no hay asignaciones para este curso,
+          // limpiamos su planificación para que vuelva a estar disponible para planificar desde cero.
+          const cursoAunAsignado = Object.values(horarioGrid).some(item => item.idCurso.toString() === cursoIdEliminado && item.id !== asignacion.id);
+          if (!cursoAunAsignado) delete nuevasPlanificaciones[cursoIdEliminado];
+          return nuevasPlanificaciones;
+      });
       
       await validarConflictos();
     } catch (error) {
@@ -168,80 +194,127 @@ export const useHorario = (horarioId) => {
   const publicarHorario = async () => {
     if (!horarioActual) return;
 
+    // Limpiar errores y conflictos anteriores antes de intentar publicar
+    setError(null);
+    setConflictos([]);
+
     try {
-      await axios.post(`/api/horarios/${horarioActual.idHorario}/publicar`);
-      setError(null);
-      alert('Horario publicado exitosamente');
+      const response = await axios.post(`/api/horarios/${horarioActual.idHorario}/publicar`);
+      alert(response.data.message || 'Horario publicado exitosamente');
+      // Aquí podrías agregar una redirección o actualización de la UI
     } catch (error) {
       console.error('Error al publicar horario:', error);
-      if (error.response?.data?.conflictos) {
-        setConflictos(error.response.data.conflictos);
-        setError('No se puede publicar el horario porque tiene conflictos');
+
+      if (error.response?.data) {
+        const errorData = error.response.data;
+        // Establecer el mensaje de error principal que viene del backend
+        setError(errorData.message || 'No se pudo publicar el horario.');
+
+        // Comprobar si la respuesta contiene 'conflictos' o 'cursos_faltantes'
+        if (errorData.conflictos) {
+          setConflictos(errorData.conflictos);
+        } else if (errorData.cursos_faltantes) {
+          // Transformamos los cursos faltantes para que el componente Alertas los pueda mostrar
+          const cursosFaltantesComoConflictos = errorData.cursos_faltantes.map(curso => ({
+            mensaje: `Falta asignar el curso: ${curso}`
+          }));
+          setConflictos(cursosFaltantesComoConflictos);
+        }
       } else {
         setError('Error al publicar el horario');
       }
     }
   };
 
-  const handleAsignarCurso = async (profesor, salon, grupo, estudiantes, sesionesPorSemana) => {
-    const diasSemana = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes'];
-    const diaInicioIndex = diasSemana.indexOf(cursoModal.dia);
+  const handleGuardarPlanificacion = (cursoId, grupos) => {
+    setPlanificaciones(prev => ({
+      ...prev,
+      [cursoId]: grupos
+    }));
+  };
 
-    if (diaInicioIndex === -1) {
-      setError("Día de inicio no válido.");
-      return;
-    }
+  const handleAbrirPlanificador = (curso) => {
+    setCursoParaPlanificar(curso);
+    setShowPlanificadorModal(true);
+  };
 
-    const detalles = [];
-    for (let i = 0; i < sesionesPorSemana; i++) {
-      const diaIndex = (diaInicioIndex + i) % diasSemana.length;
-      const dia = diasSemana[diaIndex];
-      
-      // Validar que la nueva celda no esté ocupada
-      const key = `${dia}-${cursoModal.hora}`;
-      if (horarioGrid[key]) {
-        setError(`La celda para ${dia} a las ${cursoModal.hora} ya está ocupada.`);
-        return; // Detener si una de las celdas futuras está ocupada
-      }
+  const handleAsignarSesion = async (salonId) => {
+    if (!sesionParaAsignar || !horarioActual) return;
 
-      detalles.push({
-        dia: dia,
-        hora_inicio: cursoModal.hora,
-        hora_fin: calcularHoraFin(cursoModal.hora, cursoModal.horas_totales / sesionesPorSemana),
-        salon_id: salon.idSalon
-      });
-    }
+    const { curso, grupo, sesion, dia, hora_inicio, hora_fin } = sesionParaAsignar;
 
     try {
-      const response = await axios.post(`/api/horarios/${horarioId}/asignar-curso`, {
-        curso_id: cursoModal.idCurso,
-        profesor_id: profesor.idProfesor,
-        grupo: grupo,
-        estudiantes: estudiantes,
-        detalles: detalles
+      await axios.post(`/api/horarios/${horarioId}/asignar-curso`, {
+        horario_id: horarioActual.idHorario,
+        curso_id: curso.idCurso,
+        profesor_id: grupo.profesorId,
+        grupo: grupo.id,
+        estudiantes: grupo.estudiantes,
+        dia: dia,
+        hora_inicio: hora_inicio,
+        hora_fin: hora_fin,
+        salon_id: salonId
       });
       
-      // Recargar el grid para mostrar todas las nuevas sesiones
-      await cargarHorarioGrid(horarioId);
+      // --- LÓGICA CORREGIDA: Eliminar solo la sesión específica por ID ---
+      setPlanificaciones(prevPlanificaciones => {
+        const cursoId = curso.idCurso.toString();
+        const nuevasPlanificaciones = JSON.parse(JSON.stringify(prevPlanificaciones));
+        const gruposDelCurso = nuevasPlanificaciones[cursoId];
 
-      setShowModal(false);
-      setCursoModal(null);
+        if (gruposDelCurso) {
+          const grupoAActualizar = gruposDelCurso.find(g => g.id === grupo.id);
+          if (grupoAActualizar) {
+            // Buscar la sesión por su ID único en lugar de por duración
+            const sesionIndex = grupoAActualizar.sesiones.findIndex(s => s.id === sesion.id);
+            
+            // Si se encuentra, eliminar solo esa sesión específica
+            if (sesionIndex > -1) {
+              grupoAActualizar.sesiones.splice(sesionIndex, 1);
+            }
+          }
+        }
+        
+        return nuevasPlanificaciones;
+      });
+
+      await cargarHorarioGrid(horarioId);
       await validarConflictos();
+
     } catch (error) {
-      console.error('Error al asignar curso:', error);
+      console.error('Error al asignar sesión:', error);
 
       if (error.response?.data?.conflictos) {
         setConflictos(error.response.data.conflictos);
       } else {
-        setError('Error al asignar el curso. ' + (error.response?.data?.message || ''));
+        setError('Error al asignar la sesión. ' + (error.response?.data?.message || ''));
       }
-        setShowModal(false);
-        setCursoModal(null);
+    } finally {
+      setShowAsignarSesionModal(false);
+      setSesionParaAsignar(null);
     }
   };
 
-  const cursosAsignados = Object.values(horarioGrid).map(c => c.idCurso); // Esto podría necesitar ajuste para contar por horario_curso_id
-  const cursosPendientes = cursosDisponibles.filter(c => !cursosAsignados.includes(c.idCurso));
+  // --- INICIO: Lógica mejorada para determinar cursos pendientes ---
+  // 1. Obtener los IDs de los cursos que ya están en el grid.
+  const cursosAsignadosEnGrid = new Set(Object.values(horarioGrid).map(item => item.idCurso));
+
+  const cursosPendientes = cursosDisponibles.filter(curso => {
+    // 2. Si el curso ya está en el grid, no está pendiente.
+    if (cursosAsignadosEnGrid.has(curso.idCurso)) {
+      return false;
+    }
+
+    // 3. Si no está en el grid, aplicar la lógica de planificación.
+    const plan = planificaciones[curso.idCurso];
+    if (!plan) return true; // Si no tiene planificación, está pendiente.
+    const totalSesionesRestantes = plan.reduce((acc, grupo) => acc + grupo.sesiones.length, 0);
+    return totalSesionesRestantes > 0; // Si tiene sesiones planificadas por asignar, está pendiente.
+  });
+
+  const cursosAsignados = Object.values(horarioGrid)
+  .map(c => c.idCurso)
+  .filter((id, index, array) => array.indexOf(id) === index);
 
   return {
     // Estados
@@ -249,27 +322,32 @@ export const useHorario = (horarioId) => {
     setSelectedPeriodo,
     selectedCiclo,
     setSelectedCiclo,
-    draggedCurso,
+    draggedItem,
     horarioGrid,
     conflictos,
-    showModal,
-    setShowModal,
-    cursoModal,
-    setCursoModal,
     loading,
     error,
     cursosDisponibles,
     profesores,
     salones,
     cursosPendientes,
-    cursosAsignados,
+    planificaciones,
+    showPlanificadorModal,
+    setShowPlanificadorModal,
+    cursoParaPlanificar,
+    showAsignarSesionModal,
+    setShowAsignarSesionModal,
+    sesionParaAsignar,
     
     // Funciones
+    cursosAsignados,
     handleDragStart,
     handleDrop,
     handleEliminarAsignacion,
-    handleAsignarCurso,
-    guardarHorario: () => validarConflictos(), // Renombrado para claridad
+    handleGuardarPlanificacion,
+    handleAbrirPlanificador,
+    handleAsignarSesion,
+    validarConflictos,
     publicarHorario
   };
 };

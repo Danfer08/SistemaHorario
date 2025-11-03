@@ -9,15 +9,12 @@ use App\Services\HorarioValidationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use App\Models\Curso;
 
 class HorarioController extends Controller
 {
-    protected $validationService;
-    public function __construct(HorarioValidationService $validationService)
-    {
-        $this->validationService = $validationService;
-    }
-
+    // Remover la inyección del constructor - lo inicializaremos cuando sea necesario
+    
     public function index(Request $request)
     {
         try {
@@ -98,100 +95,118 @@ class HorarioController extends Controller
         }
     }
 
-    #region AsignarCurso 💩
     public function asignarCurso(Request $request)
     {
-        log::info("ControlerAsignarCurso: Iniciado");
+        Log::info("ControllerAsignarCurso: Iniciado");
         $request->validate([
+            'horario_id' => 'required|exists:horario,idHorario',
             'curso_id' => 'required|exists:curso,idCurso',
             'profesor_id' => 'required|exists:profesor,idProfesor',
             'grupo' => 'required|in:1,2,3',
             'estudiantes' => 'required|integer|min:1',
-            'detalles' => 'required|array|min:1',
-            'detalles.*.dia' => 'required|in:Lunes,Martes,Miércoles,Jueves,Viernes,Sábado',
-            'detalles.*.hora_inicio' => 'required|date_format:H:i',
-            'detalles.*.hora_fin' => 'required|date_format:H:i|after:detalles.*.hora_inicio',
-            'detalles.*.salon_id' => 'required|exists:salon,idSalon',
+            'dia' => 'required|in:Lunes,Martes,Miércoles,Jueves,Viernes,Sábado',
+            'hora_inicio' => 'required|date_format:H:i',
+            'hora_fin' => 'required|date_format:H:i|after:hora_inicio',
+            'salon_id' => 'required|exists:salon,idSalon',
         ]);
 
         try {
             $payload = $request->all();
-            $allConflictos = [];
+            
+            Log::info("ControllerAsignarCurso: Validar conflictos para la sesión");
+            
+            // CORRECCIÓN: Inicializar el servicio con el horario_id
+            $validationService = new HorarioValidationService($payload['horario_id']);
+            
+            $dataValidacion = [
+                'FK_idProfesor' => $payload['profesor_id'],
+                'FK_idCurso' => $payload['curso_id'],
+                'FK_idSalon' => $payload['salon_id'],
+                'dia' => $payload['dia'],
+                'Hora_inicio' => $payload['hora_inicio'] . ':00',
+                'Hora_fin' => $payload['hora_fin'] . ':00',
+                'Nr_estudiantes' => $payload['estudiantes'],
+                // Agregar estos campos para exclusiones
+                'horarioCursoId' => null, // Será null para nuevas asignaciones
+                'detalleId' => null, // Será null para nuevos detalles
+            ];
 
-            log::info("ControlerAsignarCurso: Validar conflictos para cada detalle");
-            // Validar conflictos para cada detalle
-            foreach ($payload['detalles'] as $detalle) {
-                $dataValidacion = [
-                    'FK_idProfesor' => $payload['profesor_id'],
-                    'FK_idCurso' => $payload['curso_id'],
-                    'FK_idSalon' => $detalle['salon_id'],
-                    'dia' => $detalle['dia'],
-                    'Hora_inicio' => $detalle['hora_inicio'] . ':00',
-                    'Hora_fin' => $detalle['hora_fin'] . ':00',
-                    'Nr_estudiantes' => $payload['estudiantes'],
-                ];
-                $conflictos = $this->validationService->validarTodoConflictos($dataValidacion);
-                if (!empty($conflictos)) {
-                    $allConflictos = array_merge($allConflictos, $conflictos);
-                }
-            }
+            $conflictos = $validationService->validarTodoConflictos($dataValidacion);
 
-            if (!empty($allConflictos)) {
-                return response()->json(['message' => 'Conflictos detectados', 'conflictos' => $allConflictos], 422);
+            if (!empty($conflictos)) {
+                return response()->json(['message' => 'Conflictos detectados', 'conflictos' => $conflictos], 422);
             }
 
             DB::beginTransaction();
 
-            log::info("ControlerAsignarCurso: antes de crear HorarioCurso");
+            // Buscar o crear el HorarioCurso (Grupo)
+            $horarioCurso = HorarioCurso::firstOrCreate(
+                [
+                    'FK_idHorario' => $payload['horario_id'],
+                    'FK_idCurso' => $payload['curso_id'],
+                    'Grupo' => $payload['grupo'],
+                ],
+                [
+                    'FK_idProfesor' => $payload['profesor_id'],
+                    'tipo' => $payload['tipo'] ?? 'regular',
+                    'Nr_estudiantes' => $payload['estudiantes']
+                ]
+            );
 
-            $horarioCurso = HorarioCurso::create([
-                'FK_idHorario' => (int)$request->route('id'),
-                'FK_idProfesor' => $payload['profesor_id'], // Asegúrate de que estos campos existan en la tabla
-                'FK_idCurso' => $payload['curso_id'], // y en el modelo
-                'tipo' => $payload['tipo'] ?? 'regular', // 'regular' por defecto
-                'Grupo' => $payload['grupo'],
-                'Nr_estudiantes' => $payload['estudiantes']
+            Log::info("HorarioCurso (Grupo) encontrado o creado con ID: " . $horarioCurso->idHorarioCurso);
+
+            // Crear el DetalleHorarioCurso (Sesión)
+            $detalleCreado = DetalleHorarioCurso::create([
+                'FK_idHorarioCurso' => $horarioCurso->idHorarioCurso,
+                'FK_idSalon' => $payload['salon_id'],
+                'dia' => $payload['dia'],
+                'Hora_inicio' => $payload['hora_inicio'] . ':00',
+                'Hora_fin' => $payload['hora_fin'] . ':00'
             ]);
 
-            log::info("Creando Detalles de cada Curso, pero antes info");
-
-            log::info("HorarioCurso creado con ID: " . $horarioCurso->idHorarioCurso);
-
-            foreach ($payload['detalles'] as $detalle){
-                log::info("Detalle - Día: " . $detalle['dia'] . ", Hora Inicio: " . $detalle['hora_inicio'] . ", Hora Fin: " . $detalle['hora_fin'] . ", Salon ID: " . $detalle['salon_id']);
-            }
-            
-
-            $detallesCreados = [];
-            foreach ($payload['detalles'] as $detalle) {
-                $detallesCreados[] = DetalleHorarioCurso::create([
-                    'FK_idHorarioCurso' => $horarioCurso->idHorarioCurso,
-                    'FK_idSalon' => $detalle['salon_id'],
-                    'dia' => $detalle['dia'],
-                    'Hora_inicio' => $detalle['hora_inicio'] . ':00',
-                    'Hora_fin' => $detalle['hora_fin'] . ':00'
-                ]);
-            }
-
-            log::info("Terminado Detalles de cada Curso");
+            Log::info("DetalleHorarioCurso (Sesión) creado con ID: " . $detalleCreado->idDetalle_Horario_Curso);
 
             DB::commit();
             return response()->json([
-                'message' => 'Curso asignado con éxito',
+                'message' => 'Sesión del curso asignada con éxito',
                 'data' => [
                     'horarioCurso' => $horarioCurso,
-                    'detalles' => $detallesCreados
+                    'detalle' => $detalleCreado
                 ]
             ], 201);
 
         } catch (\Exception $e) {
             DB::rollBack();
-            return response()->json(['message' => 'Error al asignar el curso', 'error' => $e->getMessage()], 500);
+            return response()->json(['message' => 'Error al asignar la sesión del curso', 'error' => $e->getMessage()], 500);
         }
     }
 
+    public function eliminarAsignacion(Request $request, $id)
+    {
+        Log::info("ControlEliminacionAsignacion: Inicio");
 
-    #region confirmarHo
+        $request->validate([
+            'horario_curso_id' => 'required|exists:horario_curso,idHorarioCurso'
+        ]);
+
+        Log::info("ControlEliminacionAsignacion: Pasado validación");
+
+        try {
+            DB::beginTransaction();
+            
+            Log::info("ControlEliminacionAsignacion: Begin transaction");
+
+            DetalleHorarioCurso::where('FK_idHorarioCurso', $request->horario_curso_id)->delete();
+            // Eliminar el grupo de curso
+            HorarioCurso::where('idHorarioCurso', $request->horario_curso_id)->delete();
+            DB::commit();
+            return response()->json(['message' => 'Asignación de grupo completa eliminada']);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json(['message' => 'Error al eliminar asignación', 'error' => $e->getMessage()], 500);
+        }
+    }
+
     public function confirmarHorario($id)
     {
         try {
@@ -278,70 +293,121 @@ class HorarioController extends Controller
         return response()->json(['data' => $items]);
     }
 
-    public function eliminarAsignacion($id, Request $request)
-    {
-        $request->validate([
-            'horario_curso_id' => 'required|exists:horario_curso,idHorarioCurso'
-        ]);
-
-        try {
-            DB::beginTransaction();
-            DetalleHorarioCurso::where('FK_idHorarioCurso', $request->horario_curso_id)->delete();
-            HorarioCurso::where('idHorarioCurso', $request->horario_curso_id)->delete();
-            DB::commit();
-            return response()->json(['message' => 'Asignación eliminada']);
-        } catch (\Exception $e) {
-            DB::rollBack();
-            return response()->json(['message' => 'Error al eliminar asignación', 'error' => $e->getMessage()], 500);
-        }
-    }
-
     public function validarConflictosHorario($id)
     {
-        $conflictos = [];
-        $detalles = DetalleHorarioCurso::whereHas('horarioCurso', function ($q) use ($id) {
-                $q->where('FK_idHorario', $id);
-            })
-            ->with(['horarioCurso.curso'])
-            ->get();
-
-        foreach ($detalles as $detalle) {
-            $data = [
-                'FK_idProfesor' => $detalle->horarioCurso->FK_idProfesor,
-                'FK_idCurso' => $detalle->horarioCurso->FK_idCurso,
-                'FK_idSalon' => $detalle->FK_idSalon,
-                'dia' => $detalle->dia,
-                'Hora_inicio' => $detalle->Hora_inicio,
-                'Hora_fin' => $detalle->Hora_fin,
-                'Nr_estudiantes' => $detalle->horarioCurso->Nr_estudiantes,
-                'horarioCursoId' => $detalle->horarioCurso->idHorarioCurso,
-                'detalleId' => $detalle->idDetalle_Horario_Curso,
-            ];
-            $result = $this->validationService->validarTodoConflictos($data);
-            foreach ($result as $msg) {
-                $conflictos[] = [
-                    'mensaje' => $msg,
-                    'curso' => $detalle->horarioCurso->curso->nombre,
-                    'dia' => $detalle->dia,
-                    'hora_inicio' => $detalle->Hora_inicio,
-                    'hora_fin' => $detalle->Hora_fin,
-                ];
-            }
-        }
+        // CORRECCIÓN: Inicializar el servicio con el ID del horario
+        $validationService = new HorarioValidationService($id);
+        $conflictos = $validationService->validarConflictosHorarioCompleto();
 
         return response()->json(['data' => $conflictos]);
     }
 
     public function publicar($id)
     {
+        // Primero validar conflictos
         $conf = $this->validarConflictosHorario($id)->getData(true);
         if (!empty($conf['data'])) {
-            return response()->json(['message' => 'No se puede publicar', 'conflictos' => $conf['data']], 422);
+            return response()->json([
+                'message' => 'No se puede publicar el horario porque tiene conflictos',
+                'conflictos' => $conf['data']
+            ], 422);
+        }
+
+        // Luego validar que el horario esté completo
+        $validacionCompleto = $this->validacionHorarioCompleto($id);
+        if (!$validacionCompleto['completo']) {
+            return response()->json([
+                'message' => 'No se puede publicar el horario porque está incompleto',
+                'faltantes' => $validacionCompleto['faltantes'],
+                'cursos_faltantes' => $validacionCompleto['cursos_faltantes']
+            ], 422);
         }
 
         $horario = Horario::findOrFail($id);
         $horario->estado = 'confirmado';
         $horario->save();
-        return response()->json(['message' => 'Horario publicado']);
+
+        return response()->json(['message' => 'Horario publicado exitosamente']);
+    }
+
+    public function validacionHorarioCompleto($id)
+    {
+        $horario = Horario::findOrFail($id);
+        $horario_cursos = HorarioCurso::where('FK_idHorario', $id)
+            ->with(['detalles', 'curso'])
+            ->get();
+
+        // Determinar ciclos requeridos según la etapa
+        $ciclosRequeridos = $horario->etapa === 'I' ? [1, 3, 5, 7, 9] : [2, 4, 6, 8, 10];
+
+        // Obtener todos los cursos obligatorios para los ciclos requeridos
+        $cursosObligatoriosRequeridos = Curso::whereIn('ciclo', $ciclosRequeridos)
+            ->where('tipo_curso', 'obligatorio')
+            ->get();
+
+        // Identificar cursos irregulares asignados (para excluirlos de la validación)
+        $cursosIrregularesAsignados = $horario_cursos
+            ->where('tipo', 'irregular')
+            ->pluck('FK_idCurso')
+            ->toArray();
+
+        // Filtrar cursos obligatorios requeridos excluyendo los que son irregulares
+        $cursosObligatoriosValidar = $cursosObligatoriosRequeridos->filter(function($curso) use ($cursosIrregularesAsignados) {
+            return !in_array($curso->idCurso, $cursosIrregularesAsignados);
+        });
+
+        // Obtener cursos obligatorios que SÍ están asignados en el horario
+        $cursosObligatoriosAsignados = $horario_cursos
+            ->where('curso.tipo_curso', 'obligatorio')
+            ->pluck('FK_idCurso')
+            ->toArray();
+
+        // Identificar cursos obligatorios faltantes
+        $cursosFaltantes = $cursosObligatoriosValidar->filter(function($curso) use ($cursosObligatoriosAsignados) {
+            return !in_array($curso->idCurso, $cursosObligatoriosAsignados);
+        });
+
+        // Validar que cada curso asignado tenga al menos un detalle (sesión horaria)
+        $cursosSinDetalles = $horario_cursos->filter(function($horario_curso) {
+            return $horario_curso->detalles->isEmpty();
+        });
+
+        // Preparar respuesta
+        $completo = $cursosFaltantes->isEmpty() && $cursosSinDetalles->isEmpty();
+
+        $faltantes = [];
+        if (!$cursosSinDetalles->isEmpty()) {
+            $faltantes[] = "Hay cursos asignados sin sesiones horarias: " . 
+                $cursosSinDetalles->pluck('curso.nombre')->implode(', ');
+        }
+
+        $cursosFaltantesNombres = $cursosFaltantes->pluck('nombre')->toArray();
+
+        return [
+            'completo' => $completo,
+            'faltantes' => $faltantes,
+            'cursos_faltantes' => $cursosFaltantesNombres,
+            'total_cursos_obligatorios' => $cursosObligatoriosValidar->count(),
+            'cursos_obligatorios_asignados' => count($cursosObligatoriosAsignados),
+            'cursos_obligatorios_faltantes' => $cursosFaltantes->count(),
+            'cursos_sin_detalles' => $cursosSinDetalles->count()
+        ];
+    }
+
+    public function estadoValidacionHorario($id)
+    {
+        $validacion = $this->validacionHorarioCompleto($id);
+        
+        return response()->json([
+            'completo' => $validacion['completo'],
+            'detalles' => [
+                'total_cursos_obligatorios' => $validacion['total_cursos_obligatorios'],
+                'cursos_obligatorios_asignados' => $validacion['cursos_obligatorios_asignados'],
+                'cursos_obligatorios_faltantes' => $validacion['cursos_obligatorios_faltantes'],
+                'cursos_sin_detalles' => $validacion['cursos_sin_detalles']
+            ],
+            'faltantes' => $validacion['faltantes'],
+            'cursos_faltantes' => $validacion['cursos_faltantes']
+        ]);
     }
 }

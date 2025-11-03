@@ -1,0 +1,15 @@
+meta {
+  name: DeleteAsign
+  type: http
+  seq: 1
+}
+
+delete {
+  url: {{route_sis}}/api/horarios/2/eliminar-asignacion
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: Bearer {{access_token}}
+}
