@@ -51,11 +51,9 @@ const HorarioViewSalones = () => {
 
     // Filtrar salones según los filtros aplicados
     const salonesFiltrados = salones.filter(salon => {
-
-
-        if (filtros.salon && salon.salon.id !== filtros.id) return false;
-        if (filtros.semestre && !salon.horarios_por_semestre[filtros.semestre]) return false;
-        return true;
+    if (filtros.salon && salon.salon.id !== Number(filtros.salon)) return false;
+    if (filtros.semestre && !salon.horarios_por_semestre[filtros.semestre]) return false;
+    return true;
     });
 
     // Obtener horarios para un salón específico en el semestre seleccionado
