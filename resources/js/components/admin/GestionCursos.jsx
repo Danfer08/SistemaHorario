@@ -321,7 +321,7 @@ const GestionCursosView = () => {
                           </button>
                           <button 
                             onClick={() => handleOpenModal('edit', curso)}
-                            className="p-2 text-black hover:bg-gray-100 rounded-lg transition"
+                            className="p-2 text-black hover:bg-gray-100 rounded-lg transition text-gray-800"
                             title="Editar"
                           >
                             <Edit className="w-4 h-4" />
@@ -365,7 +365,7 @@ const GestionCursosView = () => {
                   <input
                     type="text"
                     disabled={modalMode === 'view'}
-                    className="w-full px-4 py-2 border border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+                    className="w-full px-4 py-2 border border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 text-gray-800"
                     value={formData.nombre}
                     onChange={(e) => setFormData({...formData, nombre: e.target.value})}
                   />

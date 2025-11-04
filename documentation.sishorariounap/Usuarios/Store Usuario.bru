@@ -1,0 +1,25 @@
+meta {
+  name: Store Usuario
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{route_sis}}/api/usuarios
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: Bearer {{access_token}}
+}
+
+body:json {
+  {
+    "name":"Ronald Melchor",
+    "email":"rpmi@unap.edu.pe",
+    "password":"12345678",
+    "password_confirmation": "12345678",
+    "role":2
+  }
+}

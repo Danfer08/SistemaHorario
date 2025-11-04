@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
 import { Calendar, Clock, Users, MapPin, Download, AlertCircle, Send, BookOpen } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
 
 const MiHorarioView = () => {
+  const { user } = useAuth();
   const [selectedSemestre, setSelectedSemestre] = useState('2025-I');
   const [showSolicitud, setShowSolicitud] = useState(false);
   const [solicitud, setSolicitud] = useState('');

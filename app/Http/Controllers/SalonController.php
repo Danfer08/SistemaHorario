@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Salon;
+use App\Models\DetalleHorarioCurso;
 use Illuminate\Http\Request;
 
 class SalonController extends Controller
@@ -57,4 +58,44 @@ class SalonController extends Controller
             });
         return response()->json(['data' => $salones]);
     }
+
+
+    public function horarioSalones()
+    {
+        try {
+            $salones = Salon::where('disponibilidad', 'habilitado')->get();
+            $resultado = [];
+            
+            foreach ($salones as $salon) {
+                // Obtener detalles de horario solo para horarios CONFIRMADOS
+                $detallesHorario = DetalleHorarioCurso::where('FK_idSalon', $salon->idSalon)
+                    ->whereHas('horarioCurso.horario', function($query) {
+                        $query->where('estado', 'confirmado'); // ✅ VERIFICAR ESTADO AQUÍ
+                    })
+                    ->with(['horarioCurso.curso', 'horarioCurso.profesor', 'horarioCurso.horario'])
+                    ->get()
+                    ->groupBy(function($detalle) {
+                        $horario = $detalle->horarioCurso->horario;
+                        return $horario->año . '-' . $horario->etapa;
+                    });
+                
+                $resultado[] = [
+                    'salon' => [
+                        'id' => $salon->idSalon,
+                        'codigo' => $salon->codigo,
+                        'capacidad' => $salon->capacidad,
+                        'tipo' => $salon->tipo
+                    ],
+                    'horarios_por_semestre' => $detallesHorario
+                ];
+            }
+            
+            return response()->json(['data' => $resultado]);
+            
+        } catch (\Exception $e) {
+            return response()->json(['error' => 'Error al cargar horarios'], 500);
+        }
+    }
+
+
 }

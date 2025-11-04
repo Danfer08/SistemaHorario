@@ -13,6 +13,7 @@ const allNavigationData = [
             { name: 'Horarios', icon: Home, key: 'horarios' },
             { name: 'Mi Horario', icon: Calendar, key: 'mi-horario' },
             { name: 'Plan Académico', icon: BookOpen, key: 'plan-academico' },
+            { name: 'Horario Salones', icon: Clock, key: 'horario-salones' },
         ]
     },
     {
@@ -135,6 +136,7 @@ import GestionHorariosView from './crearHorario/GestionHorarios';
 import UsuariosView from './seguridad/Usuarios';
 import RolesView from './seguridad/Roles';
 import ViewVerhorario from './crearHorario/verHorario';
+import HorarioViewSalones from './salones/salones';
 
 // Componente de Contenido Principal (Content)
 const MainContent = ({ currentView, setCurrentView, user, isViewLoading }) => {
@@ -155,6 +157,10 @@ const MainContent = ({ currentView, setCurrentView, user, isViewLoading }) => {
         case currentView === 'mi-horario':
             contentTitle = 'Mi Horario';
             content = <MiHorario user={user} />;
+            break;
+        case currentView === 'horario-salones':
+            contentTitle = 'Horario Salones';
+            content = <HorarioViewSalones user={user} />;
             break;
         case currentView === 'profesores':
             contentTitle = 'Gestión de Profesores';
@@ -235,6 +241,8 @@ const Dashboard = () => {
     const { user, isLoading, logout } = useAuth();
     const [currentView, setCurrentView] = useState('horarios');
     const [isViewLoading, setIsViewLoading] = useState(false);
+
+    console.log('Valor de user: ', user);
 
     // Nueva función para manejar el cambio de vista con un estado de carga
     const handleSetCurrentView = (newView) => {

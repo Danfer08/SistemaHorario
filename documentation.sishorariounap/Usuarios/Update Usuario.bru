@@ -1,0 +1,21 @@
+meta {
+  name: Update Usuario
+  type: http
+  seq: 3
+}
+
+put {
+  url: {{route_sis}}/api/usuarios/25
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: Bearer {{access_token}}
+}
+
+body:json {
+  {
+    "rol":2
+  }
+}

@@ -7,6 +7,7 @@ use App\Http\Controllers\HorarioController;
 use App\Http\Controllers\ProfesorController;
 use App\Http\Controllers\SalonController;
 use App\Http\Controllers\CursoController;
+use App\Http\Controllers\UserController;
 use App\Models\Curso;
 
 
@@ -38,6 +39,16 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/{id}/publicar', [HorarioController::class, 'publicar']);
     });
 
+    Route::prefix('usuarios')->group(function () {
+        Route::get('/', [UserController::class, 'index']);
+        Route::post('/', [UserController::class, 'store']);
+        Route::put('/{id}', [UserController::class, 'update']);
+        Route::delete('/{id}', [UserController::class, 'destroy']);
+    });
+
+
+    
+
     // Rutas para la gestión de profesores
     Route::prefix('profesores')->group(function () {
         Route::get('/', [ProfesorController::class, 'index']);
@@ -45,6 +56,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/disponibilidad', [ProfesorController::class, 'guardarDisponibilidad']);
         Route::put('/{id}', [ProfesorController::class, 'update']);
         Route::delete('/{id}', [ProfesorController::class, 'destroy']);
+        Route::get('/horariosprofesor/{id}', [ProfesorController::class, 'mostrarHorarios']);
     });
 
     // Rutas para la gestión de salones
@@ -53,6 +65,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/', [SalonController::class, 'store']);
         Route::put('/{id}', [SalonController::class, 'update']);
         Route::delete('/{id}', [SalonController::class, 'destroy']);
+        Route::get('/horariosalon', [SalonController::class, 'horarioSalones']);
     });
 
     // Salones disponibles (forma consumida por el front)

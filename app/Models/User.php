@@ -22,4 +22,10 @@ class User extends Authenticatable
         'password',
         'remember_token',
     ];
+
+
+    public function profesorData()
+    {
+        return $this->hasOne(Profesor::class, 'FK_user_id');
+    }
 }

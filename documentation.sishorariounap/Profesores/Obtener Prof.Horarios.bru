@@ -1,0 +1,15 @@
+meta {
+  name: Obtener Prof.Horarios.
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{route_sis}}/api/profesores/horariosprofesor/16
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: Bearer {{access_token}}
+}

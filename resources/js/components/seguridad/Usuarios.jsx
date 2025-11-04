@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
-import { Users, Plus, Search, Edit, Trash2, Eye, X, Mail, Shield, Key, AlertCircle } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Users, Plus, Search, Edit, Trash2, Eye, X, Mail, Shield, Key, AlertCircle, Loader } from 'lucide-react';
+import { UsuariosServicio } from '../../services/api';
 
 const GestionUsuariosView = () => {
   const [showModal, setShowModal] = useState(false);
@@ -7,11 +8,9 @@ const GestionUsuariosView = () => {
   const [selectedUsuario, setSelectedUsuario] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-
-  const [usuarios, setUsuarios] = useState([
-    { id: 5, name: 'Danfer', email: '21131B0737@unap.edu.pe', rol: 'admin', estado: 'activo', profesor: null, created_at: '2025-10-08' },
-    { id: 6, name: 'Picolo Parker', email: 'picolo@unap.edu.pe', rol: 'profesor', estado: 'activo', profesor: { id: 1, nombre: 'Luis Honorato Pita Astengo' }, created_at: '2025-10-11' },
-  ]);
+  const [loading, setLoading] = useState(false);
+  const [usuarios, setUsuarios] = useState([]);
+  const [error, setError] = useState(null);
 
   const profesores = [];
 
@@ -30,83 +29,148 @@ const GestionUsuariosView = () => {
     estado: 'activo'
   });
 
-  const handleOpenModal = (mode, usuario = null) => {
-    setModalMode(mode);
-    setSelectedUsuario(usuario);
-    if (usuario && mode === 'edit') {
-      setFormData({
-        name: usuario.name,
-        email: usuario.email,
-        password: '',
-        password_confirmation: '',
-        rol_id: roles.find(r => r.name === usuario.rol)?.id || '',
-        profesor_id: usuario.profesor?.id || '',
-        estado: usuario.estado
-      });
-    } else {
-      setFormData({
-        name: '',
-        email: '',
-        password: '',
-        password_confirmation: '',
-        rol_id: '',
-        profesor_id: '',
-        estado: 'activo'
-      });
+  // Cargar usuarios al montar el componente
+  useEffect(() => {
+    cargarUsuarios();
+  }, []);
+
+  const cargarUsuarios = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await UsuariosServicio.getAll();
+      
+      // Adaptar la estructura de la API
+      let usuariosData = [];
+      
+      if (response.success && Array.isArray(response.data)) {
+        usuariosData = response.data.map(usuario => ({
+          id: usuario.id,
+          name: usuario.name,
+          email: usuario.email,
+          rol: usuario.roles && usuario.roles.length > 0 ? usuario.roles[0] : 'sin rol',
+          estado: usuario.estado || 'activo',
+          profesor: usuario.profesor || null,
+          created_at: usuario.created_at || new Date().toISOString().split('T')[0],
+          es_profesor: usuario.es_profesor,
+          es_admin: usuario.es_admin
+        }));
+      } else {
+        console.warn('Formato de respuesta inesperado:', response);
+        usuariosData = [];
+      }
+      
+      setUsuarios(usuariosData);
+    } catch (err) {
+      setError('Error al cargar los usuarios');
+      console.error('Error cargando usuarios:', err);
+    } finally {
+      setLoading(false);
     }
-    setShowModal(true);
+  };
+
+  const handleOpenModal = (mode, usuario = null) => {
+  setModalMode(mode);
+  setSelectedUsuario(usuario);
+  
+  if (usuario) {
+    setFormData({
+      name: usuario.name || '',
+      email: usuario.email || '',
+      password: '',
+      password_confirmation: '',
+      rol_id: roles.find(r => r.name === usuario.rol)?.id || '',
+      profesor_id: usuario.profesor?.dataprofesor?.idProfesor || '',
+      estado: usuario.estado || 'activo'
+    });
+  } else {
+    setFormData({
+      name: '',
+      email: '',
+      password: '',
+      password_confirmation: '',
+      rol_id: '',
+      profesor_id: '',
+      estado: 'activo'
+    });
+  }
+  
+  setShowModal(true);
   };
 
   const handleCloseModal = () => {
     setShowModal(false);
     setSelectedUsuario(null);
     setShowPassword(false);
+    setError(null);
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (formData.password !== formData.password_confirmation) {
       alert('Las contraseñas no coinciden');
       return;
     }
 
-    if (modalMode === 'create') {
+    if (modalMode === 'create' && !formData.password) {
+      alert('La contraseña es requerida para crear un usuario');
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+
+    try {
       const rolSeleccionado = roles.find(r => r.id === parseInt(formData.rol_id));
-      const profesorSeleccionado = profesores.find(p => p.id === parseInt(formData.profesor_id));
       
-      const newUsuario = {
-        id: usuarios.length + 1,
+      console.log("rol selecionado", rolSeleccionado);
+      console.log("iddel rol : ", formData.rol_id);
+      // Preparar datos para la API según la estructura esperada
+      const usuarioData = {
         name: formData.name,
         email: formData.email,
-        rol: rolSeleccionado?.name || 'profesor',
-        estado: formData.estado,
-        profesor: profesorSeleccionado || null,
-        created_at: new Date().toISOString().split('T')[0]
+        role: parseInt(formData.rol_id)
       };
-      setUsuarios([...usuarios, newUsuario]);
-      alert('Usuario creado exitosamente');
-    } else if (modalMode === 'edit') {
-      const rolSeleccionado = roles.find(r => r.id === parseInt(formData.rol_id));
-      const profesorSeleccionado = profesores.find(p => p.id === parseInt(formData.profesor_id));
-      
-      setUsuarios(usuarios.map(u => 
-        u.id === selectedUsuario.id ? { 
-          ...u, 
-          name: formData.name,
-          email: formData.email,
-          rol: rolSeleccionado?.name || u.rol,
-          estado: formData.estado,
-          profesor: profesorSeleccionado || null
-        } : u
-      ));
-      alert('Usuario actualizado exitosamente');
+
+      // Solo incluir password si se está creando o modificando
+      if (formData.password) {
+        usuarioData.password = formData.password;
+        usuarioData.password_confirmation = formData.password_confirmation;
+      }
+
+      if (modalMode === 'create') {
+        await UsuariosServicio.create(usuarioData);
+        alert('Usuario creado exitosamente');
+      } else if (modalMode === 'edit') {
+        await UsuariosServicio.update(selectedUsuario.id, usuarioData);
+        alert('Usuario actualizado exitosamente');
+      }
+
+      // Recargar la lista de usuarios
+      await cargarUsuarios();
+      handleCloseModal();
+    } catch (err) {
+      const errorMessage = err.response?.data?.message || err.message || 'Error al guardar el usuario';
+      setError(errorMessage);
+      console.error('Error guardando usuario:', err);
+    } finally {
+      setLoading(false);
     }
-    handleCloseModal();
   };
 
-  const handleDelete = (id) => {
+  const handleDelete = async (id) => {
     if (window.confirm('¿Estás seguro de eliminar este usuario?')) {
-      setUsuarios(usuarios.filter(u => u.id !== id));
-      alert('Usuario eliminado exitosamente');
+      setLoading(true);
+      try {
+        await UsuariosServicio.delete(id);
+        alert('Usuario eliminado exitosamente');
+        await cargarUsuarios();
+      } catch (err) {
+        const errorMessage = err.response?.data?.message || err.message || 'Error al eliminar el usuario';
+        alert(errorMessage);
+        console.error('Error eliminando usuario:', err);
+      } finally {
+        setLoading(false);
+      }
     }
   };
 
@@ -116,13 +180,26 @@ const GestionUsuariosView = () => {
     }
   };
 
+  // Filtrar usuarios
   const filteredUsuarios = usuarios.filter(u => 
-    u.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    u.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    u.rol.toLowerCase().includes(searchTerm.toLowerCase())
+    (u.name?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
+    (u.email?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
+    (u.rol?.toLowerCase() || '').includes(searchTerm.toLowerCase())
   );
 
-  const profesoresVinculados = 0;
+  // Contar profesores vinculados
+  const profesoresVinculados = usuarios.filter(u => u.profesor).length;
+
+  if (loading && usuarios.length === 0) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-white flex items-center justify-center">
+        <div className="flex items-center gap-3">
+          <Loader className="w-8 h-8 text-blue-600 animate-spin" />
+          <p className="text-gray-600">Cargando usuarios...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-white p-6">
@@ -137,13 +214,20 @@ const GestionUsuariosView = () => {
           </div>
           <button 
             onClick={() => handleOpenModal('create')}
-            className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition shadow-md"
+            disabled={loading}
+            className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            <Plus className="w-5 h-5" />
+            {loading ? <Loader className="w-5 h-5 animate-spin" /> : <Plus className="w-5 h-5" />}
             Nuevo Usuario
           </button>
         </div>
       </div>
+
+      {error && (
+        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-6">
+          {error}
+        </div>
+      )}
 
       <div className="bg-white rounded-xl shadow-md p-6 mb-6">
         <div className="relative">
@@ -183,8 +267,20 @@ const GestionUsuariosView = () => {
         <div className="bg-white rounded-xl shadow-md p-6">
           <div className="flex items-center justify-between">
             <div>
+              <p className="text-gray-600 text-sm mb-1">Profesores Vinculados</p>
+              <p className="text-3xl font-bold text-green-600">{profesoresVinculados}</p>
+            </div>
+            <Users className="w-12 h-12 text-green-100" />
+          </div>
+        </div>
+
+        <div className="bg-white rounded-xl shadow-md p-6">
+          <div className="flex items-center justify-between">
+            <div>
               <p className="text-gray-600 text-sm mb-1">Sin Vincular</p>
-              <p className="text-3xl font-bold text-orange-600">{usuarios.length - profesoresVinculados}</p>
+              <p className="text-3xl font-bold text-orange-600">
+                {usuarios.filter(u => u.es_profesor && !u.profesor).length}
+              </p>
             </div>
             <AlertCircle className="w-12 h-12 text-orange-100" />
           </div>
@@ -199,7 +295,7 @@ const GestionUsuariosView = () => {
                 <th className="px-6 py-4 text-left text-sm font-semibold">Usuario</th>
                 <th className="px-6 py-4 text-left text-sm font-semibold">Email</th>
                 <th className="px-6 py-4 text-center text-sm font-semibold">Rol</th>
-                
+                <th className="px-6 py-4 text-center text-sm font-semibold">Profesor Vinculado</th>
                 <th className="px-6 py-4 text-center text-sm font-semibold">Estado</th>
                 <th className="px-6 py-4 text-center text-sm font-semibold">Acciones</th>
               </tr>
@@ -211,19 +307,21 @@ const GestionUsuariosView = () => {
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
                         <span className="text-blue-600 font-semibold text-sm">
-                          {usuario.name.charAt(0).toUpperCase()}
+                          {(usuario.name?.charAt(0) || 'U').toUpperCase()}
                         </span>
                       </div>
                       <div>
-                        <p className="font-semibold text-gray-800">{usuario.name}</p>
-                        <p className="text-xs text-gray-500">Creado: {usuario.created_at}</p>
+                        <p className="font-semibold text-gray-800">{usuario.name || 'Sin nombre'}</p>
+                        <p className="text-xs text-gray-500">
+                          ID: {usuario.id} • Creado: {usuario.created_at}
+                        </p>
                       </div>
                     </div>
                   </td>
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-2 text-gray-700">
                       <Mail className="w-4 h-4 text-gray-400" />
-                      {usuario.email}
+                      {usuario.email || 'Sin email'}
                     </div>
                   </td>
                   <td className="px-6 py-4 text-center">
@@ -234,45 +332,56 @@ const GestionUsuariosView = () => {
                         ? 'bg-blue-100 text-blue-700'
                         : 'bg-green-100 text-green-700'
                     }`}>
-                      {usuario.rol}
+                      {usuario.rol || 'Sin rol'}
                     </span>
                   </td>
                   
+                  <td className="px-6 py-4 text-center">
+                    {usuario.profesor ? (
+                      <div className="text-sm text-gray-700">
+                        <div className="font-medium">
+                          {usuario.profesor.dataprofesor.nombre} {usuario.profesor.dataprofesor.apellido}
+                        </div>
+                        <div className="text-xs text-gray-500">
+                          DNI: {usuario.profesor.dataprofesor.dni}
+                        </div>
+                      </div>
+                    ) : (
+                      <span className="text-orange-600 text-sm">No vinculado</span>
+                    )}
+                  </td>
+
                   <td className="px-6 py-4 text-center">
                     <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
                       usuario.estado === 'activo'
                         ? 'bg-green-100 text-green-700'
                         : 'bg-red-100 text-red-700'
                     }`}>
-                      {usuario.estado}
+                      {usuario.estado || 'activo'}
                     </span>
                   </td>
                   <td className="px-6 py-4">
                     <div className="flex items-center justify-center gap-2">
                       <button 
                         onClick={() => handleOpenModal('view', usuario)}
-                        className="p-2 text-black hover:bg-gray-100 rounded-lg transition"
+                        disabled={loading}
+                        className="p-2 text-black hover:bg-gray-100 rounded-lg transition disabled:opacity-50"
                         title="Ver detalles"
                       >
                         <Eye className="w-4 h-4" />
                       </button>
                       <button 
                         onClick={() => handleOpenModal('edit', usuario)}
-                        className="p-2 text-black hover:bg-gray-100 rounded-lg transition"
+                        disabled={loading}
+                        className="p-2 text-black hover:bg-gray-100 rounded-lg transition disabled:opacity-50"
                         title="Editar"
                       >
                         <Edit className="w-4 h-4" />
                       </button>
                       <button 
-                        onClick={() => handleResetPassword(usuario)}
-                        className="p-2 text-black hover:bg-gray-100 rounded-lg transition"
-                        title="Restablecer contraseña"
-                      >
-                        <Key className="w-4 h-4" />
-                      </button>
-                      <button 
                         onClick={() => handleDelete(usuario.id)}
-                        className="p-2 text-black hover:bg-gray-100 rounded-lg transition"
+                        disabled={loading}
+                        className="p-2 text-black hover:bg-gray-100 rounded-lg transition disabled:opacity-50"
                         title="Eliminar"
                       >
                         <Trash2 className="w-4 h-4" />
@@ -283,6 +392,13 @@ const GestionUsuariosView = () => {
               ))}
             </tbody>
           </table>
+          {filteredUsuarios.length === 0 && (
+            <div className="text-center py-8 text-gray-500">
+              {usuarios.length === 0 
+                ? 'No hay usuarios registrados' 
+                : 'No se encontraron usuarios que coincidan con la búsqueda'}
+            </div>
+          )}
         </div>
       </div>
 
@@ -295,32 +411,42 @@ const GestionUsuariosView = () => {
                 {modalMode === 'edit' && 'Editar Usuario'}
                 {modalMode === 'view' && 'Detalles del Usuario'}
               </h3>
-              <button onClick={handleCloseModal} className="text-white hover:text-blue-100">
+              <button 
+                onClick={handleCloseModal} 
+                disabled={loading}
+                className="text-white hover:text-blue-100 disabled:opacity-50"
+              >
                 <X className="w-6 h-6" />
               </button>
             </div>
 
             <div className="p-6">
+              {error && (
+                <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+                  {error}
+                </div>
+              )}
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="md:col-span-2">
                   <label className="block text-sm font-medium text-gray-700 mb-2">Nombre Completo</label>
                   <input
                     type="text"
-                    disabled={modalMode === 'view'}
+                    disabled={modalMode === 'view' || loading}
                     placeholder="Nombre del usuario"
-                    className="w-full px-4 py-2 border border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+                    className="w-full px-4 py-2 border border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 text-gray-900"
                     value={formData.name}
                     onChange={(e) => setFormData({...formData, name: e.target.value})}
                   />
                 </div>
 
                 <div className="md:col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Correo Electrónico</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Correo Electrónico @unap.edu.pe</label>
                   <input
                     type="email"
-                    disabled={modalMode === 'view'}
+                    disabled={modalMode === 'view' || loading}
                     placeholder="usuario@unap.edu.pe"
-                    className="w-full px-4 py-2 border border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+                    className="w-full px-4 py-2 border border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 text-gray-900"
                     value={formData.email}
                     onChange={(e) => setFormData({...formData, email: e.target.value})}
                   />
@@ -329,13 +455,15 @@ const GestionUsuariosView = () => {
                 {modalMode !== 'view' && (
                   <>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                      <label className="block text-sm font-medium text-gray-700 mb-2 text-gray-900">
                         {modalMode === 'create' ? 'Contraseña' : 'Nueva Contraseña'}
+                        {modalMode === 'edit'}
                       </label>
                       <input
                         type={showPassword ? 'text' : 'password'}
-                        placeholder="Mínimo 8 caracteres"
-                        className="w-full px-4 py-2 border border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-500"
+                        disabled={loading}
+                        placeholder={modalMode === 'create' ? "Mínimo 8 caracteres" : "Nueva contraseña"}
+                        className="w-full px-4 py-2 border border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 text-gray-900"
                         value={formData.password}
                         onChange={(e) => setFormData({...formData, password: e.target.value})}
                       />
@@ -345,8 +473,9 @@ const GestionUsuariosView = () => {
                       <label className="block text-sm font-medium text-gray-700 mb-2">Confirmar Contraseña</label>
                       <input
                         type={showPassword ? 'text' : 'password'}
+                        disabled={loading}
                         placeholder="Repetir contraseña"
-                        className="w-full px-4 py-2 border border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-500"
+                        className="w-full px-4 py-2 border border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 text-gray-900"
                         value={formData.password_confirmation}
                         onChange={(e) => setFormData({...formData, password_confirmation: e.target.value})}
                       />
@@ -358,6 +487,7 @@ const GestionUsuariosView = () => {
                           type="checkbox"
                           checked={showPassword}
                           onChange={(e) => setShowPassword(e.target.checked)}
+                          disabled={loading}
                           className="rounded border-gray-300"
                         />
                         Mostrar contraseñas
@@ -369,8 +499,8 @@ const GestionUsuariosView = () => {
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Rol</label>
                   <select
-                    disabled={modalMode === 'view'}
-                    className="w-full px-4 py-2 border border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+                    disabled={modalMode === 'view' || loading}
+                    className="w-full px-4 py-2 border border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 text-gray-900"
                     value={formData.rol_id}
                     onChange={(e) => setFormData({...formData, rol_id: e.target.value})}
                   >
@@ -381,13 +511,11 @@ const GestionUsuariosView = () => {
                   </select>
                 </div>
 
-                
-
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Estado</label>
                   <select
-                    disabled={modalMode === 'view'}
-                    className="w-full px-4 py-2 border border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+                    disabled={modalMode === 'view' || loading}
+                    className="w-full px-4 py-2 border border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 text-gray-900"
                     value={formData.estado}
                     onChange={(e) => setFormData({...formData, estado: e.target.value})}
                   >
@@ -401,13 +529,16 @@ const GestionUsuariosView = () => {
                 <div className="flex gap-3 mt-6 pt-6 border-t border-gray-200">
                   <button
                     onClick={handleSubmit}
-                    className="flex-1 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-semibold"
+                    disabled={loading}
+                    className="flex-1 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-semibold disabled:opacity-50 flex items-center justify-center gap-2"
                   >
+                    {loading && <Loader className="w-4 h-4 animate-spin" />}
                     {modalMode === 'create' ? 'Crear Usuario' : 'Guardar Cambios'}
                   </button>
                   <button
                     onClick={handleCloseModal}
-                    className="flex-1 px-6 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition font-semibold"
+                    disabled={loading}
+                    className="flex-1 px-6 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition font-semibold disabled:opacity-50"
                   >
                     Cancelar
                   </button>

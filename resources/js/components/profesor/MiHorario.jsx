@@ -1,140 +1,112 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, Clock, Users, BookOpen, Download, AlertCircle, CheckCircle, Loader } from 'lucide-react';
-import axios from 'axios';
-import { useAcademicYears } from '../../utils/yearsHorario';
+import { Calendar, Clock, Users, MapPin, Download, AlertCircle, Send, BookOpen } from 'lucide-react';
+import { useAuth } from '../../contexts/AuthContext';
+import { ProfesorService } from '../../services/api';
 
 const MiHorarioView = () => {
-
-  const { years } = useAcademicYears();
-  const [loading, setLoading] = useState(false);
+  const { user } = useAuth();
+  const [selectedSemestre, setSelectedSemestre] = useState('2025-I');
+  const [showSolicitud, setShowSolicitud] = useState(false);
+  const [solicitud, setSolicitud] = useState('');
+  const [horarios, setHorarios] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [selectedPeriodo, setSelectedPeriodo] = useState({ año: '2025', etapa: 'I' });
-  
-  // Estados para datos del profesor
-  const [profesorData, setProfesorData] = useState(null);
-  const [horarioData, setHorarioData] = useState([]);
-  const [stats, setStats] = useState({
-    cargaActual: 0,
-    cargaMaxima: 20,
-    totalSecciones: 0,
-    totalEstudiantes: 0
-  });
 
-  const dias = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado']; // Sábado incluido
+  const dias = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
   const horas = ['07:00', '08:00', '09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00', '18:00','19:00','20:00','21:00','22:00','23:00'];
 
-  // Configurar axios con token de autenticación
+  // Cargar horarios del profesor
   useEffect(() => {
-    const token = localStorage.getItem('token');
-    if (token) {
-      axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+    if (user?.profesor?.idProfesor) {
+      cargarHorarios();
     }
-  }, []);
+  }, [user]);
 
-  // Cargar datos del profesor al montar el componente
-  useEffect(() => {
-    cargarDatosProfesor();
-  }, []);
+  console.log('ID del profesor', user?.profesor?.idProfesor)
 
-  // Cargar horario cuando cambie el período
-  useEffect(() => {
-    if (profesorData) {
-      cargarMiHorario();
-    }
-  }, [selectedPeriodo, profesorData]);
-
-  const cargarDatosProfesor = async () => {
+  const cargarHorarios = async () => {
     try {
-      const response = await axios.get('/api/user');
-      const user = response.data?.data ?? response.data;
-
-      if (!user) {
-        setError('No se pudo obtener la información del usuario');
-        return;
-      }
-
-      // Buscar el profesor asociado al usuario
-      const profesorResponse = await axios.get('/api/profesores', {
-        params: { search: user.name }
-      });
-
-      // Manejar distintas formas de respuesta y proteger contra undefined
-      const profArray = profesorResponse?.data?.data ?? profesorResponse?.data ?? [];
-
-      if (Array.isArray(profArray) && profArray.length > 0) {
-        setProfesorData(profArray[0]);
-      } else {
-        console.warn('Respuesta inesperada al buscar profesor:', profesorResponse);
-        setError('No se encontró información del profesor');
-      }
-    } catch (error) {
-      console.error('Error al cargar datos del profesor:', error);
-      setError('Error al cargar los datos del profesor');
-    }
-  };
-
-  const cargarMiHorario = async () => {
-    if (!profesorData) return;
-
-    setLoading(true);
-    try {
-      // Buscar horarios confirmados para el período
-      const horariosResponse = await axios.get('/api/horarios', {
-        params: {
-          año: selectedPeriodo.año,
-          etapa: selectedPeriodo.etapa,
-          estado: 'confirmado'
-        }
-      });
-
-      const horariosArray = horariosResponse?.data?.data ?? horariosResponse?.data ?? [];
-      const horarioEncontrado = Array.isArray(horariosArray) ? horariosArray.find(h => 
-        h.año == selectedPeriodo.año && h.etapa === selectedPeriodo.etapa
-      ) : undefined;
-
-      if (!horarioEncontrado) {
-        setHorarioData([]);
-        setError('No se encontró un horario confirmado para el período seleccionado');
-        return;
-      }
-
-      // Obtener horarios del profesor
-      const response = await axios.get(`/api/horarios/${horarioEncontrado.idHorario}/grid`, {
-        params: {
-          profesor_id: profesorData.idProfesor
-        }
-      });
-
-      const gridData = response?.data?.data ?? response?.data ?? [];
-      setHorarioData(Array.isArray(gridData) ? gridData : []);
-      if (Array.isArray(gridData)) {
-        calcularStats(gridData);
-      }
-    } catch (error) {
-      console.error('Error al cargar horario:', error);
-      setError('Error al cargar el horario');
+      setLoading(true);
+      const response = await ProfesorService.getHorarios(user.profesor.idProfesor);
+      setHorarios(response.data);
+      setError(null);
+    } catch (err) {
+      setError('Error al cargar los horarios');
+      console.error(err);
     } finally {
       setLoading(false);
     }
   };
 
-  const calcularStats = (horarios) => {
-    const cargaActual = horarios.reduce((sum, h) => {
-      const inicio = parseInt(h.hora.split(':')[0]);
-      const fin = parseInt(h.hora_fin.split(':')[0]);
-      return sum + (fin - inicio); // Suma las horas de cada sesión
-    }, 0);
+  // Filtra el horario basado en el semestre seleccionado
+  const horarioFiltrado = React.useMemo(() => {
+    if (!horarios.length) return [];
+    const [año, etapa] = selectedSemestre.split('-');
+    return horarios.filter(h => h.año.toString() === año && h.etapa === etapa);
+  }, [horarios, selectedSemestre]);
 
-    const totalSecciones = [...new Set(horarios.map(h => h.horario_curso_id))].length;
-    const totalEstudiantes = horarios.reduce((sum, h) => sum + h.estudiantes, 0);
+  let TotalEstudiantes = 0;
 
-    setStats({
-      cargaActual,
-      cargaMaxima: 20,
-      totalSecciones,
-      totalEstudiantes
+  // Calcular estadísticas
+  const calcularEstadisticas = () => {
+    if (!horarioFiltrado.length) return { totalHoras: 0, totalCursos: 0, totalEstudiantes: 0 };
+    
+    let totalHoras = 0;
+    let totalCursos = 0;
+    let totalEstudiantes = 0;
+    const cursosUnicos = new Set();
+
+    horarioFiltrado.forEach(horario => {
+      horario.horario_cursos.forEach(curso => {
+        // Calcular horas por curso (suma de duraciones de detalles)
+        const horasCurso = curso.detalles.reduce((sum, detalle) => {
+          const inicio = new Date(`2000-01-01T${detalle.Hora_inicio}`);
+          const fin = new Date(`2000-01-01T${detalle.Hora_fin}`);
+          return sum + (fin - inicio) / (1000 * 60 * 60); // Convertir a horas
+        }, 0);
+        
+        totalHoras += horasCurso;
+        totalEstudiantes += curso.Nr_estudiantes || 0;
+        TotalEstudiantes = totalEstudiantes;
+        cursosUnicos.add(curso.FK_idCurso);
+      });
     });
+
+    totalCursos = cursosUnicos.size;
+
+    return { totalHoras: Math.round(totalHoras), totalCursos, totalEstudiantes };
   };
+
+  // Convertir datos de la API al formato que necesita el grid
+  const generarMisClases = () => {
+    if (!horarioFiltrado.length) return [];
+
+    const clases = [];
+    
+    horarioFiltrado.forEach(horario => {
+      horario.horario_cursos.forEach(curso => {
+        curso.detalles.forEach(detalle => {
+          clases.push({
+            id: curso.idHorarioCurso,
+            curso: curso.curso.nombre,
+            ciclo: curso.curso.ciclo,
+            grupo: curso.Grupo,
+            estudiantes: curso.Nr_estudiantes || 0,
+            dia: detalle.dia,
+            hora: detalle.Hora_inicio,
+            hora_fin: detalle.Hora_fin,
+            salon: `S-${detalle.FK_idSalon}`,
+            horas_totales: curso.curso.horas_totales
+          });
+        });
+      });
+    });
+
+    return clases;
+  };
+
+  const stats = calcularEstadisticas();
+  const misClases = generarMisClases();
 
   const getDuracionEnHoras = (horaInicio, horaFin) => {
     if (!horaInicio || !horaFin) return 1;
@@ -145,7 +117,7 @@ const MiHorarioView = () => {
 
   const horarioProcesado = React.useMemo(() => {
     const grid = {};
-    horarioData.forEach(clase => {
+    misClases.forEach(clase => {
       const duracion = getDuracionEnHoras(clase.hora, clase.hora_fin);
       const horaInicioNum = parseInt(clase.hora.split(':')[0], 10);
       for (let i = 0; i < duracion; i++) {
@@ -154,44 +126,111 @@ const MiHorarioView = () => {
       }
     });
     return grid;
-  }, [horarioData]);
+  }, [misClases]);
 
-  const exportarPDF = () => {
-    // Implementar exportación a PDF
-    alert('Función de exportación a PDF en desarrollo');
-  };
 
-  const solicitarCambio = () => {
-    // Implementar solicitud de cambios
-    alert('Función de solicitud de cambios en desarrollo');
-  };
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-white p-6 flex items-center justify-center">
+        <div className="text-center">
+          <Calendar className="w-12 h-12 text-blue-600 animate-pulse mx-auto mb-4" />
+          <p className="text-gray-600">Cargando horario...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-white p-6 flex items-center justify-center">
+        <div className="text-center">
+          <AlertCircle className="w-12 h-12 text-red-600 mx-auto mb-4" />
+          <h2 className="text-xl font-bold text-gray-800 mb-2">Error</h2>
+          <p className="text-gray-600 mb-4">{error}</p>
+          <button 
+            onClick={cargarHorarios}
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+          >
+            Reintentar
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-white p-6">
       {/* Header */}
       <div className="mb-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <div className="flex items-center gap-3 mb-2">
-              <Calendar className="w-8 h-8 text-blue-600" />
-              <h1 className="text-3xl font-bold text-gray-800">Mi Horario</h1>
+        <div className="flex items-center gap-3 mb-2">
+          <Calendar className="w-8 h-8 text-blue-600" />
+          <h1 className="text-3xl font-bold text-gray-800">Mi Horario</h1>
+        </div>
+        <p className="text-gray-600">Bienvenido, {user?.nombre || 'Profesor'}</p>
+      </div>
+
+      {/* Stats Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+        <div className="bg-white rounded-xl shadow-md p-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-gray-600 text-sm mb-1">Carga Horaria</p>
+              <p className="text-3xl font-bold text-blue-600">{stats.totalHoras}h</p>
+              <p className="text-xs text-gray-500 mt-1">asignadas</p>
             </div>
-            <p className="text-gray-600">
-              {profesorData ? `${profesorData.nombre} ${profesorData.apellido}` : 'Cargando...'}
-            </p>
+            <Clock className="w-12 h-12 text-blue-100" />
+          </div>
+        </div>
+
+        <div className="bg-white rounded-xl shadow-md p-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-gray-600 text-sm mb-1">Total Cursos</p>
+              <p className="text-3xl font-bold text-blue-600">{stats.totalCursos}</p>
+              <p className="text-xs text-gray-500 mt-1">asignados</p>
+            </div>
+            <BookOpen className="w-12 h-12 text-blue-100" />
+          </div>
+        </div>
+
+        <div className="bg-white rounded-xl shadow-md p-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-gray-600 text-sm mb-1">Total Estudiantes</p>
+              <p className="text-3xl font-bold text-blue-600">{stats.totalEstudiantes}</p>
+              <p className="text-xs text-gray-500 mt-1">bajo su cargo</p>
+            </div>
+            <Users className="w-12 h-12 text-blue-100" />
+          </div>
+        </div>
+      </div>
+
+      {/* Selector de Semestre y Acciones */}
+      <div className="bg-white rounded-xl shadow-md p-6 mb-6">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Semestre Académico</label>
+            <select 
+              className="px-4 py-2 border border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-black"
+              value={selectedSemestre}
+              onChange={(e) => setSelectedSemestre(e.target.value)}
+            >
+              {horarios.map(horario => (
+                <option key={horario.idHorario} value={`${horario.año}-${horario.etapa}`}>
+                  {horario.año} - {horario.etapa}
+                </option>
+              ))}
+            </select>
           </div>
           <div className="flex gap-3">
             <button 
-              onClick={solicitarCambio}
-              className="flex items-center gap-2 px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 transition"
-            >
-              <AlertCircle className="w-4 h-4" />
-              Solicitar Cambios
-            </button>
-            <button 
-              onClick={exportarPDF}
+              onClick={() => setShowSolicitud(!showSolicitud)}
               className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
             >
+              <Send className="w-4 h-4" />
+              Solicitar Cambio
+            </button>
+            <button className="flex items-center gap-2 px-4 py-2 bg-white text-blue-600 border border-blue-600 rounded-lg hover:bg-blue-50 transition">
               <Download className="w-4 h-4" />
               Descargar PDF
             </button>
@@ -199,176 +238,107 @@ const MiHorarioView = () => {
         </div>
       </div>
 
-      {/* Selector de Período */}
-      <div className="bg-white rounded-xl shadow-md p-6 mb-6">
-        <h2 className="text-lg font-semibold text-gray-800 mb-4">Período Académico</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-              <label className="block text-sm font-medium text-gray-900 mb-2">Año</label>
-          <select 
-            className="w-full px-4 py-2 border text-gray-900 border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
-            value={years.año}
-            onChange={(e) => !isReadOnly && setSelectedPeriodo({...selectedPeriodo, año: e.target.value})}
-          >
-            {years.map(year => (
-              <option key={year} value={year.toString()}>
-                {year}
-              </option>
-            ))}
-          </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Etapa</label>
-            <select 
-              className="w-full px-4 py-2 border text-gray-900 border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500"
-              value={selectedPeriodo.etapa}
-              onChange={(e) => setSelectedPeriodo({...selectedPeriodo, etapa: e.target.value})}
-            >
-              <option value="I">I</option>
-              <option value="II">II</option>
-            </select>
-          </div>
-        </div>
-      </div>
 
-      {/* Mensaje de Error */}
-      {error && (
-        <div className="bg-red-50 border-2 border-red-300 rounded-xl p-4 mb-6">
-          <div className="flex items-center gap-2">
-            <div className="w-4 h-4 bg-red-500 rounded-full"></div>
-            <p className="text-red-700 font-medium">{error}</p>
-          </div>
-        </div>
-      )}
+      {/* Mi Horario Grid */}
+      <div className="bg-white rounded-xl shadow-md p-6 overflow-x-auto mb-6">
+        <h3 className="text-lg font-semibold text-gray-800 mb-4">
+          Mi Horario Semanal - {selectedSemestre}
+        </h3>
 
-      {/* Estadísticas */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-        <div className="bg-white rounded-xl shadow-md p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-gray-600 text-sm mb-1">Carga Horaria</p>
-              <p className="text-2xl font-bold text-blue-600">{stats.cargaActual}h</p>
-              <p className="text-xs text-gray-500">Máximo: {stats.cargaMaxima}h</p>
-            </div>
-            <Clock className="w-8 h-8 text-blue-600" />
+        {misClases.length === 0 ? (
+          <div className="text-center py-8">
+            <Calendar className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+            <p className="text-gray-600">No tienes clases asignadas para este período</p>
           </div>
-          <div className="mt-2 bg-gray-200 rounded-full h-2">
-            <div 
-              className="bg-blue-600 h-2 rounded-full transition-all"
-              style={{ width: `${Math.min((stats.cargaActual / stats.cargaMaxima) * 100, 100)}%` }}
-            />
-          </div>
-        </div>
-        <div className="bg-white rounded-xl shadow-md p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-gray-600 text-sm mb-1">Total Secciones</p>
-              <p className="text-2xl font-bold text-green-600">{stats.totalSecciones}</p>
-            </div>
-            <BookOpen className="w-8 h-8 text-green-600" />
-          </div>
-        </div>
-        <div className="bg-white rounded-xl shadow-md p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-gray-600 text-sm mb-1">Total Estudiantes</p>
-              <p className="text-2xl font-bold text-purple-600">{stats.totalEstudiantes}</p>
-            </div>
-            <Users className="w-8 h-8 text-purple-600" />
-          </div>
-        </div>
-        <div className="bg-white rounded-xl shadow-md p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-gray-600 text-sm mb-1">Estado</p>
-              <p className="text-lg font-bold text-green-600">Activo</p>
-            </div>
-            <CheckCircle className="w-8 h-8 text-green-600" />
-          </div>
-        </div>
-      </div>
-
-      {/* Horario Grid */}
-      <div className="bg-white rounded-xl shadow-md p-6 overflow-x-auto">
-        <div className="flex justify-between items-center mb-4">
-          <h3 className="text-lg font-semibold text-gray-800">
-            Horario Personal - {selectedPeriodo.año}-{selectedPeriodo.etapa}
-          </h3>
-          {loading && (
-            <div className="flex items-center gap-2 text-blue-600">
-              <Loader className="w-4 h-4 animate-spin" />
-              <span className="text-sm">Cargando...</span>
-            </div>
-          )}
-        </div>
-
-        <div className="min-w-[900px]">
-          <div className="grid grid-cols-7 gap-2">
-            {/* Header */}
-            <div className="bg-blue-600 text-white p-3 rounded-lg font-semibold text-center">
-              Hora
-            </div>
-            {dias.map(dia => (
-              <div key={dia} className="bg-blue-600 text-white p-3 rounded-lg font-semibold text-center">
-                {dia}
+        ) : (
+          <div className="min-w-[900px]">
+            <div className="grid grid-cols-7 gap-2">
+              {/* Header */}
+              <div className="bg-blue-600 text-white p-3 rounded-lg font-semibold text-center">
+                Hora
               </div>
-            ))}
-
-            {/* Filas de horarios */}
-            {horas.map((hora, idx) => (
-              <React.Fragment key={hora}>
-                <div className="bg-blue-50 p-3 rounded-lg font-medium text-center text-gray-700 flex items-center justify-center">
-                  {hora}
+              {dias.map(dia => (
+                <div key={dia} className="bg-blue-600 text-white p-3 rounded-lg font-semibold text-center">
+                  {dia}
                 </div>
-                {dias.map(dia => {
-                  const key = `${dia}-${hora}`;
-                  const clase = horarioProcesado[key];
-                  return (
-                    <div 
-                      key={`${dia}-${hora}`} 
-                      className={`p-3 rounded-lg border-2 min-h-[80px] ${
-                        clase 
-                          ? `bg-blue-100 border-blue-300 cursor-pointer hover:bg-blue-200 transition ${!clase.isStart ? 'border-t-0 rounded-t-none' : ''}`
-                          : 'bg-gray-50 border-gray-200'
-                      }`}
-                    >
-                      {clase && clase.isStart && (
-                        <div className="text-xs">
-                          <div className="font-bold text-blue-900 mb-1">{clase.curso}</div>
-                          <div className="text-gray-700">Grupo {clase.grupo}</div>
-                          <div className="text-blue-600 font-medium mt-1">{clase.salon}</div>
-                          <div className="text-gray-500 text-xs mt-1">
-                            {clase.estudiantes} estudiantes
+              ))}
+
+              {/* Filas de horarios */}
+              {horas.map(hora => (
+                <React.Fragment key={hora}>
+                  <div className="bg-blue-50 p-3 rounded-lg font-medium text-center text-gray-700 flex items-center justify-center">
+                    {hora}
+                  </div>
+                  {dias.map(dia => {
+                    const key = `${dia}-${hora}`;
+                    const clase = horarioProcesado[key];
+                    return (
+                      <div 
+                        key={`${dia}-${hora}`} 
+                        className={`p-3 rounded-lg border-2 min-h-[100px] transition ${
+                          clase 
+                            ? `bg-gradient-to-br from-blue-100 to-blue-50 border-blue-400 shadow-sm hover:shadow-md cursor-pointer ${!clase.isStart ? 'border-t-0 rounded-t-none' : ''}`
+                            : 'bg-gray-50 border-gray-200'
+                        }`}
+                      >
+                        {clase && clase.isStart && (
+                          <div className="text-xs">
+                            <div className="font-bold text-blue-900 mb-2">{clase.curso}</div>
+                            <div className="flex items-center gap-1 text-gray-700 mb-1">
+                              <span>Ciclo {clase.ciclo} - G{clase.grupo}</span>
+                            </div>
+                            <div className="flex items-center gap-1 text-blue-600 mb-1">
+                              <MapPin className="w-3 h-3" />
+                              <span className="font-medium">{clase.salon}</span>
+                            </div>
+                            <div className="flex items-center gap-1 text-gray-600">
+                              <Users className="w-3 h-3" />
+                              <span>{clase.estudiantes} est.</span>
+                            </div>
                           </div>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </React.Fragment>
-            ))}
+                        )}
+                      </div>
+                    );
+                  })}
+                </React.Fragment>
+              ))}
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
-      {/* Lista Detallada de Cursos */}
-      {horarioData.length > 0 && (
-        <div className="mt-6 bg-white rounded-xl shadow-md p-6">
-          <h3 className="text-lg font-semibold text-gray-800 mb-4">Detalle de Cursos</h3>
+      {/* Lista de Cursos */}
+      {misClases.length > 0 && (
+        <div className="bg-white rounded-xl shadow-md p-6">
+          <h3 className="text-lg font-semibold text-gray-800 mb-4">Detalle de Mis Cursos</h3>
           <div className="space-y-3">
-            {horarioData.map((clase, index) => (
-              <div key={index} className="flex items-center justify-between p-4 bg-blue-50 rounded-lg">
-                <div className="flex-1">
-                  <h4 className="font-semibold text-gray-800">{clase.curso}</h4>
-                  <p className="text-sm text-gray-600">
-                    {clase.dia} - {clase.hora} | Grupo {clase.grupo} | {clase.salon}
-                  </p>
+            {Array.from(new Set(misClases.map(c => c.curso))).map(curso => {
+              const secciones = misClases.filter(c => c.curso === curso);
+              const totalEstudiantes = TotalEstudiantes;
+              return (
+                <div key={curso} className="border-2 border-blue-100 rounded-lg p-4 hover:bg-blue-50 hover:border-blue-300 transition">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h4 className="font-semibold text-gray-800 text-lg">{curso}</h4>
+                      <p className="text-sm text-gray-600 mt-1">
+                        {secciones.length} {secciones.length === 1 ? 'sección' : 'secciones'}
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-sm text-gray-600">Total estudiantes</p>
+                      <p className="text-2xl font-bold text-blue-600">{totalEstudiantes}</p>
+                    </div>
+                  </div>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {secciones.map((sec, idx) => (
+                      <div key={idx} className="text-xs bg-blue-100 text-blue-700 px-3 py-1 rounded-full">
+                        Grupo {sec.grupo} - {sec.estudiantes} est.
+                      </div>
+                    ))}
+                  </div>
                 </div>
-                <div className="text-right">
-                  <p className="text-sm font-medium text-blue-600">{clase.estudiantes} estudiantes</p>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}

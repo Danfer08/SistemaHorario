@@ -1,0 +1,15 @@
+meta {
+  name: Delete Usuario
+  type: http
+  seq: 4
+}
+
+delete {
+  url: {{route_sis}}/api/usuarios/8
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: Bearer {{access_token}}
+}

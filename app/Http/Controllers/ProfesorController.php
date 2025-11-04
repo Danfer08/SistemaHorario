@@ -3,6 +3,9 @@
 namespace App\Http\Controllers;
 
 use App\Models\Profesor;
+use App\Models\Horario;
+use App\Models\HorarioCurso;
+use App\Models\DetalleHorarioCurso;
 use Illuminate\Http\Request;
 
 class ProfesorController extends Controller
@@ -58,4 +61,28 @@ class ProfesorController extends Controller
         $profesor->delete();
         return response()->json(['status' => 'success']);
     }
+
+    
+    public function mostrarHorarios($id)
+    {
+            try {
+                $profesor = Profesor::findOrFail($id);
+
+                // Obtener horarios donde el profesor tiene cursos asignados
+                $horarios = Horario::where('estado','confirmado')->whereHas('horarioCursos', function($query) use ($id) {
+                    $query->where('FK_idProfesor', $id);
+                })
+                ->with(['horarioCursos' => function($query) use ($id) {
+                    $query->where('FK_idProfesor', $id)
+                        ->with(['curso', 'detalles']);
+                }])
+                ->get();
+
+                return response()->json(['data' => $horarios]);
+
+            } catch (\Exception $e) {
+                return response()->json(['error' => 'Profesor no encontrado'], 404);
+            }
+    }
+
 }
