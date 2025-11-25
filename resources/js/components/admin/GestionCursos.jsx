@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { BookOpen, Plus, Search, Edit, Trash2, Eye, X, Clock, Award, Filter, Loader } from 'lucide-react';
 import axios from 'axios';
+import { useToast } from '../../contexts/ToastContext';
 
 const GestionCursosView = () => {
+  const { showToast } = useToast();
   const [showModal, setShowModal] = useState(false);
   const [modalMode, setModalMode] = useState('create');
   const [selectedCurso, setSelectedCurso] = useState(null);
@@ -10,7 +12,6 @@ const GestionCursosView = () => {
   const [filterCiclo, setFilterCiclo] = useState('');
   const [filterTipo, setFilterTipo] = useState('');
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
 
   const [cursos, setCursos] = useState([]);
   const [stats, setStats] = useState({
@@ -59,7 +60,7 @@ const GestionCursosView = () => {
       setStats(statsData);
     } catch (error) {
       console.error('Error al cargar cursos:', error);
-      setError('Error al cargar los cursos');
+      showToast('Error al cargar los cursos', 'error');
     } finally {
       setLoading(false);
     }
@@ -100,22 +101,22 @@ const GestionCursosView = () => {
   const handleSubmit = async () => {
     const horasTotales = parseInt(formData.horas_teoria) + parseInt(formData.horas_practica);
     const cursoData = { ...formData, horas_totales: horasTotales };
-    
+
     setLoading(true);
     try {
       if (modalMode === 'create') {
         await axios.post('/api/cursos', cursoData);
-        alert('Curso creado exitosamente');
+        showToast('Curso creado exitosamente', 'success');
       } else {
         await axios.put(`/api/cursos/${selectedCurso.idCurso}`, cursoData);
-        alert('Curso actualizado exitosamente');
+        showToast('Curso actualizado exitosamente', 'success');
       }
-      
+
       await cargarCursos();
       handleCloseModal();
     } catch (error) {
       console.error('Error al guardar curso:', error);
-      setError('Error al guardar el curso');
+      showToast('Error al guardar el curso', 'error');
     } finally {
       setLoading(false);
     }
@@ -129,11 +130,11 @@ const GestionCursosView = () => {
     setLoading(true);
     try {
       await axios.delete(`/api/cursos/${curso.idCurso}`);
-      alert('Curso eliminado exitosamente');
+      showToast('Curso eliminado exitosamente', 'success');
       await cargarCursos();
     } catch (error) {
       console.error('Error al eliminar curso:', error);
-      setError('Error al eliminar el curso');
+      showToast('Error al eliminar el curso', 'error');
     } finally {
       setLoading(false);
     }
@@ -144,7 +145,7 @@ const GestionCursosView = () => {
     const nombre = (c.nombre || '').toString();
     const descripcion = (c.descripcion || '').toString();
     const matchSearch = nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                       descripcion.toLowerCase().includes(searchTerm.toLowerCase());
+      descripcion.toLowerCase().includes(searchTerm.toLowerCase());
     const matchCiclo = filterCiclo === '' || c.ciclo === filterCiclo;
     const matchTipo = filterTipo === '' || c.tipo_curso === filterTipo;
     return matchSearch && matchCiclo && matchTipo;
@@ -169,7 +170,7 @@ const GestionCursosView = () => {
             </div>
             <p className="text-gray-600">Administra el catálogo de cursos de la carrera</p>
           </div>
-          <button 
+          <button
             onClick={() => handleOpenModal('create')}
             className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition shadow-md"
           >
@@ -195,17 +196,17 @@ const GestionCursosView = () => {
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
-          <select 
+          <select
             className="px-4 py-2 border border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-500 text-black"
             value={filterCiclo}
             onChange={(e) => setFilterCiclo(e.target.value)}
           >
             <option value="">Todos los ciclos</option>
-            {[1,2,3,4,5,6,7,8,9,10].map(c => (
+            {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(c => (
               <option key={c} value={c}>{c}° Ciclo</option>
             ))}
           </select>
-          <select 
+          <select
             className="px-4 py-2 border border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-500 text-black"
             value={filterTipo}
             onChange={(e) => setFilterTipo(e.target.value)}
@@ -217,15 +218,7 @@ const GestionCursosView = () => {
         </div>
       </div>
 
-      {/* Mensaje de Error */}
-      {error && (
-        <div className="bg-red-50 border-2 border-red-300 rounded-xl p-4 mb-6">
-          <div className="flex items-center gap-2">
-            <div className="w-4 h-4 bg-red-500 rounded-full"></div>
-            <p className="text-red-700 font-medium">{error}</p>
-          </div>
-        </div>
-      )}
+
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
         <div className="bg-white rounded-xl shadow-md p-6">
@@ -267,7 +260,7 @@ const GestionCursosView = () => {
       </div>
 
       <div className="space-y-6">
-        {Object.keys(groupedCursos).sort().map(ciclo => (
+      {Object.keys(groupedCursos).sort((a, b) => parseInt(a) - parseInt(b)).map(ciclo => (
           <div key={ciclo} className="bg-white rounded-xl shadow-md overflow-hidden">
             <div className="bg-blue-600 text-white px-6 py-3">
               <h3 className="text-lg font-semibold">{ciclo}° Ciclo - {groupedCursos[ciclo].length} cursos</h3>
@@ -293,11 +286,10 @@ const GestionCursosView = () => {
                         </div>
                       </td>
                       <td className="px-6 py-4 text-center">
-                        <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                          curso.tipo_curso === 'obligatorio'
-                            ? 'bg-blue-100 text-blue-700'
-                            : 'bg-green-100 text-green-700'
-                        }`}>
+                        <span className={`px-3 py-1 rounded-full text-xs font-semibold ${curso.tipo_curso === 'obligatorio'
+                          ? 'bg-blue-100 text-blue-700'
+                          : 'bg-green-100 text-green-700'
+                          }`}>
                           {curso.tipo_curso === 'obligatorio' ? 'Obligatorio' : 'Electivo'}
                         </span>
                       </td>
@@ -312,21 +304,14 @@ const GestionCursosView = () => {
                       </td>
                       <td className="px-6 py-4">
                         <div className="flex items-center justify-center gap-2">
-                          <button 
-                            onClick={() => handleOpenModal('view', curso)}
-                            className="p-2 text-black hover:bg-gray-100 rounded-lg transition"
-                            title="Ver detalles"
-                          >
-                            <Eye className="w-4 h-4" />
-                          </button>
-                          <button 
+                          <button
                             onClick={() => handleOpenModal('edit', curso)}
                             className="p-2 text-black hover:bg-gray-100 rounded-lg transition text-gray-800"
                             title="Editar"
                           >
                             <Edit className="w-4 h-4" />
                           </button>
-                          <button 
+                          <button
                             onClick={() => handleDelete(curso)}
                             className="p-2 text-black hover:bg-gray-100 rounded-lg transition"
                             title="Eliminar"
@@ -346,7 +331,7 @@ const GestionCursosView = () => {
 
       {showModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 overflow-y-auto">
-          <div className="bg-white rounded-xl shadow-2xl max-w-3xl w-full my-8">
+          <div className="bg-white rounded-xl shadow-2xl max-w-3xl w-full my-8 max-h-[90vh] overflow-y-auto">
             <div className="bg-blue-600 text-white px-6 py-4 rounded-t-xl flex items-center justify-between">
               <h3 className="text-xl font-bold">
                 {modalMode === 'create' && 'Nuevo Curso'}
@@ -361,37 +346,37 @@ const GestionCursosView = () => {
             <div className="p-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="md:col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Nombre del Curso</label>
+                  <label className="block text-sm font-medium text-gray-900 mb-2">Nombre del Curso</label>
                   <input
                     type="text"
                     disabled={modalMode === 'view'}
-                    className="w-full px-4 py-2 border border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 text-gray-800"
+                    className="w-full px-4 py-2 border border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 text-black"
                     value={formData.nombre}
-                    onChange={(e) => setFormData({...formData, nombre: e.target.value})}
+                    onChange={(e) => setFormData({ ...formData, nombre: e.target.value })}
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Ciclo</label>
+                  <label className="block text-sm font-medium text-gray-900 mb-2">Ciclo</label>
                   <select
                     disabled={modalMode === 'view'}
-                    className="w-full px-4 py-2 border border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+                    className="w-full px-4 py-2 border border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 text-black"
                     value={formData.ciclo}
-                    onChange={(e) => setFormData({...formData, ciclo: e.target.value})}
+                    onChange={(e) => setFormData({ ...formData, ciclo: e.target.value })}
                   >
-                    {[1,2,3,4,5,6,7,8,9,10].map(c => (
+                    {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(c => (
                       <option key={c} value={c}>{c}° Ciclo</option>
                     ))}
                   </select>
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Tipo de Curso</label>
+                  <label className="block text-sm font-medium text-gray-900 mb-2">Tipo de Curso</label>
                   <select
                     disabled={modalMode === 'view'}
-                    className="w-full px-4 py-2 border border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+                    className="w-full px-4 py-2 border border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 text-black"
                     value={formData.tipo_curso}
-                    onChange={(e) => setFormData({...formData, tipo_curso: e.target.value})}
+                    onChange={(e) => setFormData({ ...formData, tipo_curso: e.target.value })}
                   >
                     <option value="obligatorio">Obligatorio</option>
                     <option value="electivo">Electivo</option>
@@ -399,48 +384,48 @@ const GestionCursosView = () => {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Horas de Teoría</label>
+                  <label className="block text-sm font-medium text-gray-900 mb-2">Horas de Teoría</label>
                   <input
                     type="number"
                     min="0"
                     disabled={modalMode === 'view'}
-                    className="w-full px-4 py-2 border border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+                    className="w-full px-4 py-2 border border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 text-black"
                     value={formData.horas_teoria}
-                    onChange={(e) => setFormData({...formData, horas_teoria: parseInt(e.target.value) || 0})}
+                    onChange={(e) => setFormData({ ...formData, horas_teoria: parseInt(e.target.value) || 0 })}
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Horas de Práctica</label>
+                  <label className="block text-sm font-medium text-gray-900 mb-2">Horas de Práctica</label>
                   <input
                     type="number"
                     min="0"
                     disabled={modalMode === 'view'}
-                    className="w-full px-4 py-2 border border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+                    className="w-full px-4 py-2 border border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 text-black"
                     value={formData.horas_practica}
-                    onChange={(e) => setFormData({...formData, horas_practica: parseInt(e.target.value) || 0})}
+                    onChange={(e) => setFormData({ ...formData, horas_practica: parseInt(e.target.value) || 0 })}
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Créditos</label>
+                  <label className="block text-sm font-medium text-gray-900 mb-2">Créditos</label>
                   <input
                     type="number"
                     min="1"
                     disabled={modalMode === 'view'}
-                    className="w-full px-4 py-2 border border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+                    className="w-full px-4 py-2 border border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 text-black"
                     value={formData.creditos}
-                    onChange={(e) => setFormData({...formData, creditos: parseInt(e.target.value) || 0})}
+                    onChange={(e) => setFormData({ ...formData, creditos: parseInt(e.target.value) || 0 })}
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Duración de Sesión (min)</label>
+                  <label className="block text-sm font-medium text-gray-900 mb-2">Duración de Sesión (min)</label>
                   <select
                     disabled={modalMode === 'view'}
-                    className="w-full px-4 py-2 border border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+                    className="w-full px-4 py-2 border border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 text-black"
                     value={formData.duracion_sesion}
-                    onChange={(e) => setFormData({...formData, duracion_sesion: parseInt(e.target.value)})}
+                    onChange={(e) => setFormData({ ...formData, duracion_sesion: parseInt(e.target.value) })}
                   >
                     <option value={45}>45 min</option>
                     <option value={90}>90 min</option>
@@ -450,12 +435,12 @@ const GestionCursosView = () => {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Tipo de Salón</label>
+                  <label className="block text-sm font-medium text-gray-900 mb-2">Tipo de Salón</label>
                   <select
                     disabled={modalMode === 'view'}
-                    className="w-full px-4 py-2 border border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+                    className="w-full px-4 py-2 border border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 text-black"
                     value={formData.tipo_salon}
-                    onChange={(e) => setFormData({...formData, tipo_salon: e.target.value})}
+                    onChange={(e) => setFormData({ ...formData, tipo_salon: e.target.value })}
                   >
                     <option value="normal">Aula Normal</option>
                     <option value="laboratorio">Laboratorio</option>
@@ -463,26 +448,26 @@ const GestionCursosView = () => {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Número de Secciones</label>
+                  <label className="block text-sm font-medium text-gray-900 mb-2">Número de Secciones</label>
                   <input
                     type="number"
                     min="1"
                     max="5"
                     disabled={modalMode === 'view'}
-                    className="w-full px-4 py-2 border border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+                    className="w-full px-4 py-2 border border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 text-black"
                     value={formData.num_secciones}
-                    onChange={(e) => setFormData({...formData, num_secciones: parseInt(e.target.value) || 1})}
+                    onChange={(e) => setFormData({ ...formData, num_secciones: parseInt(e.target.value) || 1 })}
                   />
                 </div>
 
                 <div className="md:col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Descripción</label>
+                  <label className="block text-sm font-medium text-gray-900 mb-2">Descripción</label>
                   <textarea
                     rows="3"
                     disabled={modalMode === 'view'}
                     className="w-full px-4 py-2 border border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 resize-none"
                     value={formData.descripcion}
-                    onChange={(e) => setFormData({...formData, descripcion: e.target.value})}
+                    onChange={(e) => setFormData({ ...formData, descripcion: e.target.value })}
                     placeholder="Breve descripción del curso..."
                   />
                 </div>

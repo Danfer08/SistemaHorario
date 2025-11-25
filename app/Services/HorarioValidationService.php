@@ -178,9 +178,11 @@ class HorarioValidationService
             $conflictos[] = "El salón {$salon->codigo} ya está ocupado en este horario";
         }
 
-        // Validar conflicto de ciclo
+        // Validar conflicto de ciclo (Solo si NO es irregular)
+        $tipo = $data['tipo'] ?? 'regular';
         $curso = Curso::find($data['FK_idCurso']);
-        if ($this->validarConflictoCiclo(
+        
+        if ($tipo !== 'irregular' && $this->validarConflictoCiclo(
             $curso->ciclo,
             $data['dia'],
             $data['Hora_inicio'],

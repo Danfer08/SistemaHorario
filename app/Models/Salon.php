@@ -13,7 +13,12 @@ class Salon extends Model
     protected $fillable = [
         'tipo',
         'capacidad',
-        'disponibilidad'
+        'disponibilidad',
+        'equipamiento'
+    ];
+
+    protected $casts = [
+        'equipamiento' => 'array'
     ];
 
     public function detallesHorarioCurso()

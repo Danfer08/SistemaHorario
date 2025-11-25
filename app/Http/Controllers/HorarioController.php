@@ -10,6 +10,8 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use App\Models\Curso;
+use App\Models\Profesor;
+use App\Models\Salon;
 
 class HorarioController extends Controller
 {
@@ -161,6 +163,7 @@ class HorarioController extends Controller
                 // Agregar estos campos para exclusiones
                 'horarioCursoId' => null, // Será null para nuevas asignaciones
                 'detalleId' => null, // Será null para nuevos detalles
+                'tipo' => $payload['tipo'] ?? 'regular',
             ];
 
             $conflictos = $validationService->validarTodoConflictos($dataValidacion);
@@ -239,6 +242,47 @@ class HorarioController extends Controller
         }
     }
 
+    public function actualizarAsignacion(Request $request, $id)
+    {
+        $request->validate([
+            'horario_curso_id' => 'required|exists:horario_curso,idHorarioCurso',
+            'profesor_id' => 'required|exists:profesor,idProfesor'
+        ]);
+
+        try {
+            DB::beginTransaction();
+
+            $horarioCurso = HorarioCurso::findOrFail($request->horario_curso_id);
+            $detalles = DetalleHorarioCurso::where('FK_idHorarioCurso', $horarioCurso->idHorarioCurso)->get();
+            
+            // Validar conflictos para el nuevo profesor en todas las sesiones del grupo
+            $validationService = new HorarioValidationService($id);
+            
+            foreach ($detalles as $detalle) {
+                if ($validationService->validarConflictoProfesor(
+                    $request->profesor_id, 
+                    $detalle->dia, 
+                    $detalle->Hora_inicio, 
+                    $detalle->Hora_fin
+                )) {
+                    return response()->json(['message' => "El profesor seleccionado tiene conflictos de horario en {$detalle->dia} {$detalle->Hora_inicio}"], 422);
+                }
+            }
+
+            // Actualizar profesor
+            $horarioCurso->FK_idProfesor = $request->profesor_id;
+            $horarioCurso->save();
+
+            DB::commit();
+            
+            return response()->json(['message' => 'Profesor actualizado con éxito']);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json(['message' => 'Error al actualizar asignación', 'error' => $e->getMessage()], 500);
+        }
+    }
+
     public function confirmarHorario($id)
     {
         try {
@@ -297,8 +341,11 @@ class HorarioController extends Controller
         $items = DetalleHorarioCurso::whereHas('horarioCurso', function ($q) use ($id, $ciclo) {
                 $q->where('FK_idHorario', $id)
                   ->when($ciclo, function ($qq) use ($ciclo) {
-                      $qq->whereHas('curso', function ($qc) use ($ciclo) {
-                          $qc->where('ciclo', $ciclo);
+                      $qq->where(function($query) use ($ciclo) {
+                          $query->whereHas('curso', function ($qc) use ($ciclo) {
+                              $qc->where('ciclo', $ciclo);
+                          })
+                          ->orWhere('tipo', 'irregular');
                       });
                   });
             })
@@ -424,6 +471,216 @@ class HorarioController extends Controller
             'cursos_obligatorios_faltantes' => $cursosFaltantes->count(),
             'cursos_sin_detalles' => $cursosSinDetalles->count()
         ];
+    }
+
+    public function generarAutomatico($id)
+    {
+        set_time_limit(300); // 5 minutos
+        
+        try {
+            DB::beginTransaction();
+
+            $horario = Horario::findOrFail($id);
+            $validationService = new \App\Services\HorarioValidationService($id);
+            
+            // 1. Determinar cursos requeridos (Solo obligatorios/regulares)
+            $ciclos = $horario->etapa === 'I' ? [1, 3, 5, 7, 9] : [2, 4, 6, 8, 10];
+            $cursos = Curso::whereIn('ciclo', $ciclos)
+                          ->where('tipo_curso', 'obligatorio')
+                          ->orderBy('horas_totales', 'desc') // Priorizar cursos largos
+                          ->orderBy('ciclo', 'asc')
+                          ->get();
+            
+            // 2. Obtener recursos
+            $salonesTodos = Salon::where('disponibilidad', 'habilitado')->get();
+            $profesoresTodos = Profesor::where('estado', 'activo')->get();
+            
+            // 3. Cargar estado actual del horario en memoria para evitar N+1 queries
+            $ocupacionSalones = []; // [salon_id][dia][hora] = true
+            $ocupacionProfesores = []; // [profesor_id][dia][hora] = true
+            $ocupacionCiclos = []; // [ciclo][dia][hora] = true
+            
+            $detallesExistentes = DetalleHorarioCurso::whereHas('horarioCurso', function($q) use ($id) {
+                $q->where('FK_idHorario', $id);
+            })->with(['horarioCurso.curso'])->get();
+
+            foreach ($detallesExistentes as $detalle) {
+                $dia = $detalle->dia;
+                $inicio = (int)substr($detalle->Hora_inicio, 0, 2);
+                $fin = (int)substr($detalle->Hora_fin, 0, 2);
+                
+                for ($h = $inicio; $h < $fin; $h++) {
+                    $ocupacionSalones[$detalle->FK_idSalon][$dia][$h] = true;
+                    $ocupacionProfesores[$detalle->horarioCurso->FK_idProfesor][$dia][$h] = true;
+                    $ocupacionCiclos[$detalle->horarioCurso->curso->ciclo][$dia][$h] = true;
+                }
+            }
+
+            $asignados = 0;
+            $errores = [];
+
+            foreach ($cursos as $curso) {
+                // Verificar si ya está asignado
+                $yaAsignado = HorarioCurso::where('FK_idHorario', $id)
+                    ->where('FK_idCurso', $curso->idCurso)
+                    ->exists();
+                
+                if ($yaAsignado) continue;
+
+                $horasTeoria = $curso->horas_teoria;
+                $horasPractica = $curso->horas_practica;
+                $totalHoras = $horasTeoria + $horasPractica;
+
+                if ($totalHoras == 0) continue;
+
+                // Definir las sesiones necesarias
+                $sesionesRequeridas = [];
+                if ($horasTeoria > 0) {
+                    $sesionesRequeridas[] = ['tipo' => 'Teoría', 'horas' => $horasTeoria];
+                }
+                if ($horasPractica > 0) {
+                    $sesionesRequeridas[] = ['tipo' => 'Práctica', 'horas' => $horasPractica];
+                }
+
+                // Si solo hay una sesión (ej: solo teoría), tratarla normal
+                // Si hay dos, intentar asignarlas en días diferentes
+                
+                $asignado = false;
+                $salones = $salonesTodos->where('capacidad', '>=', 30)->values();
+                $dias = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+
+                // Estrategia: Iterar Profesores -> Buscar slots para TODAS las sesiones
+                foreach ($profesoresTodos as $profesor) {
+                    if ($asignado) break;
+
+                    // Intentar encontrar slots para las sesiones requeridas con este profesor
+                    $slotsEncontrados = []; // Almacenará [dia, horaInicio, horaFin, salonId] para cada sesión
+                    $diasUsados = []; // Para evitar repetir días si hay múltiples sesiones
+
+                    foreach ($sesionesRequeridas as $index => $sesion) {
+                        $horas = $sesion['horas'];
+                        $slotEncontradoParaSesion = false;
+
+                        // Buscar slot
+                        foreach ($dias as $dia) {
+                            if ($slotEncontradoParaSesion) break;
+                            
+                            // Preferencia: Días diferentes para sesiones diferentes
+                            if (in_array($dia, $diasUsados)) continue; 
+
+                            for ($hora = 7; $hora <= (22 - $horas); $hora++) {
+                                if ($slotEncontradoParaSesion) break;
+
+                                // Validar Ciclo (Memoria)
+                                $conflictoCiclo = false;
+                                for ($h = $hora; $h < ($hora + $horas); $h++) {
+                                    if (isset($ocupacionCiclos[$curso->ciclo][$dia][$h])) {
+                                        $conflictoCiclo = true;
+                                        break;
+                                    }
+                                }
+                                if ($conflictoCiclo) continue;
+
+                                // Validar Profesor (Memoria)
+                                $conflictoProfesor = false;
+                                for ($h = $hora; $h < ($hora + $horas); $h++) {
+                                    if (isset($ocupacionProfesores[$profesor->idProfesor][$dia][$h])) {
+                                        $conflictoProfesor = true;
+                                        break;
+                                    }
+                                }
+                                if ($conflictoProfesor) continue;
+
+                                // Buscar Salón
+                                foreach ($salones as $salon) {
+                                    // Validar Salón (Memoria)
+                                    $conflictoSalon = false;
+                                    for ($h = $hora; $h < ($hora + $horas); $h++) {
+                                        if (isset($ocupacionSalones[$salon->idSalon][$dia][$h])) {
+                                            $conflictoSalon = true;
+                                            break;
+                                        }
+                                    }
+                                    if ($conflictoSalon) continue;
+
+                                    // ¡Slot Válido Encontrado!
+                                    $slotsEncontrados[] = [
+                                        'dia' => $dia,
+                                        'hora' => $hora,
+                                        'horas' => $horas,
+                                        'salon' => $salon
+                                    ];
+                                    $diasUsados[] = $dia;
+                                    $slotEncontradoParaSesion = true;
+                                    break; // Break salones
+                                }
+                            }
+                        }
+                        
+                        // Si no encontramos slot para esta sesión (respetando días diferentes),
+                        // intentar relajar la restricción de días diferentes (si es la 2da sesión)
+                        if (!$slotEncontradoParaSesion && count($diasUsados) > 0) {
+                             // Reintentar sin la restricción "continue if in_array($dia, $diasUsados)"
+                             // (Lógica simplificada: si falla estricto, fallamos profesor. 
+                             //  Podríamos hacer backtracking pero es costoso. 
+                             //  Asumiremos que si no hay en otro día, pasamos al siguiente profesor).
+                        }
+                    }
+
+                    // Verificar si encontramos slots para TODAS las sesiones requeridas
+                    if (count($slotsEncontrados) === count($sesionesRequeridas)) {
+                        // ¡Éxito! Asignar todo
+                        $horarioCurso = HorarioCurso::create([
+                            'FK_idHorario' => $id,
+                            'FK_idCurso' => $curso->idCurso,
+                            'FK_idProfesor' => $profesor->idProfesor,
+                            'Grupo' => '1',
+                            'tipo' => 'regular',
+                            'Nr_estudiantes' => 30
+                        ]);
+
+                        foreach ($slotsEncontrados as $slot) {
+                            $horaInicio = sprintf('%02d:00:00', $slot['hora']);
+                            $horaFin = sprintf('%02d:00:00', $slot['hora'] + $slot['horas']);
+
+                            DetalleHorarioCurso::create([
+                                'FK_idHorarioCurso' => $horarioCurso->idHorarioCurso,
+                                'FK_idSalon' => $slot['salon']->idSalon,
+                                'dia' => $slot['dia'],
+                                'Hora_inicio' => $horaInicio,
+                                'Hora_fin' => $horaFin
+                            ]);
+
+                            // Actualizar Memoria
+                            for ($h = $slot['hora']; $h < ($slot['hora'] + $slot['horas']); $h++) {
+                                $ocupacionSalones[$slot['salon']->idSalon][$slot['dia']][$h] = true;
+                                $ocupacionProfesores[$profesor->idProfesor][$slot['dia']][$h] = true;
+                                $ocupacionCiclos[$curso->ciclo][$slot['dia']][$h] = true;
+                            }
+                        }
+
+                        $asignado = true;
+                        $asignados++;
+                    }
+                }
+                
+                if (!$asignado) {
+                    $errores[] = "No se pudo asignar el curso {$curso->nombre} (Ciclo {$curso->ciclo})";
+                }
+            }
+
+            DB::commit();
+
+            return response()->json([
+                'message' => "Proceso completado. Se asignaron {$asignados} cursos.",
+                'errores' => $errores
+            ]);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('Error en generación automática: ' . $e->getMessage());
+            return response()->json(['message' => 'Error interno en generación automática', 'error' => $e->getMessage()], 500);
+        }
     }
 
     public function estadoValidacionHorario($id)

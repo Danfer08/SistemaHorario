@@ -15,6 +15,9 @@ class Profesor extends Model
         'apellido',
         'dni',
         'correo',
+        'telefono',
+        'categoria',
+        'estado',
         'FK_user_id'
     ];
 

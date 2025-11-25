@@ -1,15 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { Briefcase, Plus, Search, Edit, Trash2, Eye, X, User, Loader } from 'lucide-react';
 import apiClient from '../../api/apiConfig';
+import { useToast } from '../../contexts/ToastContext';
 
 const GestionProfesoresView = () => {
+  const { showToast } = useToast();
   const [showModal, setShowModal] = useState(false);
   const [modalMode, setModalMode] = useState('create');
   const [selectedProfesor, setSelectedProfesor] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [showDisponibilidad, setShowDisponibilidad] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
 
   const [profesores, setProfesores] = useState([]);
   const [stats, setStats] = useState({
@@ -56,10 +57,9 @@ const GestionProfesoresView = () => {
         inactivos: total - activos
       });
 
-      setError(null);
     } catch (error) {
       console.error('Error al cargar profesores:', error);
-      setError(error.response?.data?.message || 'Error al cargar los profesores');
+      showToast(error.response?.data?.message || 'Error al cargar los profesores', 'error');
     } finally {
       setLoading(false);
     }
@@ -98,53 +98,59 @@ const GestionProfesoresView = () => {
     setShowDisponibilidad(false);
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const saveProfesor = async (closeModal = true) => {
     setLoading(true);
-    setError(null);
 
     try {
       if (modalMode === 'create') {
-        const response = await apiClient.post('/profesores', formData);
-        if (response.data.status === 'success') {
-          await cargarProfesores();
-          handleCloseModal();
-        }
+        await apiClient.post('/profesores', formData);
+        showToast('Profesor creado exitosamente', 'success');
+        await cargarProfesores();
+        if (closeModal) handleCloseModal();
       } else {
-        const response = await apiClient.put(`/profesores/${selectedProfesor.idProfesor}`, formData);
-        if (response.data.status === 'success') {
-          await cargarProfesores();
-          handleCloseModal();
+        await apiClient.put(`/profesores/${selectedProfesor.idProfesor}`, formData);
+        showToast('Profesor actualizado exitosamente', 'success');
+        await cargarProfesores();
+        if (!closeModal) {
+             console.log('Auto-saved successfully');
         }
+        if (closeModal) handleCloseModal();
       }
     } catch (error) {
       console.error('Error al guardar profesor:', error);
-      setError(error.response?.data?.message || 'Error al guardar el profesor');
+      const msg = error.response?.data?.message || 'Error al guardar el profesor';
+      showToast(msg, 'error');
       if (error.response?.data?.errors) {
-        // Mostrar errores de validación específicos
         const validationErrors = Object.values(error.response.data.errors).flat();
-        setError(validationErrors.join('\n'));
+        validationErrors.forEach(err => showToast(err, 'error'));
       }
     } finally {
       setLoading(false);
     }
   };
 
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    saveProfesor(true);
+  };
+
+
+
   const handleDelete = async (profesor) => {
     if (!confirm(`¿Estás seguro de eliminar a ${profesor.nombre} ${profesor.apellido}?`)) {
       return;
     }
-    
+
     setLoading(true);
     try {
       const response = await apiClient.delete(`/profesores/${profesor.idProfesor}`);
       if (response.data.status === 'success') {
+        showToast('Profesor eliminado exitosamente', 'success');
         await cargarProfesores();
-        setError(null);
       }
     } catch (error) {
       console.error('Error al eliminar profesor:', error);
-      setError(error.response?.data?.message || 'Error al eliminar el profesor');
+      showToast(error.response?.data?.message || 'Error al eliminar el profesor', 'error');
     } finally {
       setLoading(false);
     }
@@ -157,7 +163,7 @@ const GestionProfesoresView = () => {
       setDisponibilidad(disp);
     } catch (error) {
       console.error('Error al cargar disponibilidad:', error);
-      setError('Error al cargar la disponibilidad');
+      showToast('Error al cargar la disponibilidad', 'error');
     }
   };
 
@@ -169,10 +175,10 @@ const GestionProfesoresView = () => {
       await axios.put(`/api/profesores/${selectedProfesor.idProfesor}/disponibilidad`, {
         disponibilidad: disponibilidad
       });
-      alert('Disponibilidad guardada exitosamente');
+      showToast('Disponibilidad guardada exitosamente', 'success');
     } catch (error) {
       console.error('Error al guardar disponibilidad:', error);
-      setError('Error al guardar la disponibilidad');
+      showToast('Error al guardar la disponibilidad', 'error');
     } finally {
       setLoading(false);
     }
@@ -212,7 +218,7 @@ const GestionProfesoresView = () => {
             </div>
             <p className="text-gray-600">Administra el registro de docentes y su disponibilidad horaria</p>
           </div>
-          <button 
+          <button
             onClick={() => handleOpenModal('create')}
             className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition shadow-md"
           >
@@ -242,15 +248,7 @@ const GestionProfesoresView = () => {
         </div>
       </div>
 
-      {/* Mensaje de Error */}
-      {error && (
-        <div className="bg-red-50 border-2 border-red-300 rounded-xl p-4 mb-6">
-          <div className="flex items-center gap-2">
-            <div className="w-4 h-4 bg-red-500 rounded-full"></div>
-            <p className="text-red-700 font-medium">{error}</p>
-          </div>
-        </div>
-      )}
+
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
         <div className="bg-white rounded-xl shadow-md p-6">
@@ -306,12 +304,12 @@ const GestionProfesoresView = () => {
                         </span>
                       </div>
                       <div>
-                        <p className="font-semibold text-gray-800">{profesor.nombre} {profesor.apellido}</p>
+                        <p className="font-semibold text-black">{profesor.nombre} {profesor.apellido}</p>
                       </div>
                     </div>
                   </td>
-                  <td className="px-6 py-4 text-gray-700">{profesor.dni}</td>
-                  <td className="px-6 py-4 text-gray-700">{profesor.correo}</td>
+                  <td className="px-6 py-4 text-black">{profesor.dni}</td>
+                  <td className="px-6 py-4 text-black">{profesor.correo}</td>
                   <td className="px-6 py-4">
                     <div className="flex flex-col items-center">
                       <span className="text-sm text-gray-600">Carga horaria</span>
@@ -319,29 +317,21 @@ const GestionProfesoresView = () => {
                     </div>
                   </td>
                   <td className="px-6 py-4 text-center">
-                    <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                      profesor.FK_user_id ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                    }`}>
-                      {profesor.FK_user_id ? 'Activo' : 'Inactivo'}
+                    <span className={`px-3 py-1 rounded-full text-xs font-semibold ${profesor.estado === 'activo' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                      }`}>
+                      {profesor.estado === 'activo' ? 'Activo' : 'Inactivo'}
                     </span>
                   </td>
                   <td className="px-6 py-4">
                     <div className="flex items-center justify-center gap-2">
-                      <button 
-                        onClick={() => handleOpenModal('view', profesor)}
-                        className="p-2 text-black hover:bg-gray-100 rounded-lg transition"
-                        title="Ver detalles"
-                      >
-                        <Eye className="w-4 h-4" />
-                      </button>
-                      <button 
+                      <button
                         onClick={() => handleOpenModal('edit', profesor)}
                         className="p-2 text-black hover:bg-gray-100 rounded-lg transition"
                         title="Editar"
                       >
                         <Edit className="w-4 h-4" />
                       </button>
-                      <button 
+                      <button
                         onClick={() => handleDelete(profesor)}
                         className="p-2 text-black hover:bg-gray-100 rounded-lg transition"
                         title="Eliminar"
@@ -360,7 +350,7 @@ const GestionProfesoresView = () => {
 
       {showModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 overflow-y-auto">
-          <div className="bg-white rounded-xl shadow-2xl max-w-4xl w-full my-8">
+          <div className="bg-white rounded-xl shadow-2xl max-w-4xl w-full my-8 max-h-[90vh] overflow-y-auto">
             <div className="bg-blue-600 text-white px-6 py-4 rounded-t-xl flex items-center justify-between">
               <h3 className="text-xl font-bold">
                 {modalMode === 'create' && 'Nuevo Profesor'}
@@ -377,22 +367,20 @@ const GestionProfesoresView = () => {
                 <button
                   type="button"
                   onClick={() => setShowDisponibilidad(false)}
-                  className={`px-6 py-3 font-semibold ${
-                    !showDisponibilidad 
-                      ? 'text-blue-600 border-b-2 border-blue-600' 
-                      : 'text-gray-600 hover:text-gray-800'
-                  }`}
+                  className={`px-6 py-3 font-semibold ${!showDisponibilidad
+                    ? 'text-blue-600 border-b-2 border-blue-600'
+                    : 'text-gray-600 hover:text-gray-800'
+                    }`}
                 >
                   Datos Personales
                 </button>
                 <button
                   type="button"
                   onClick={() => setShowDisponibilidad(true)}
-                  className={`px-6 py-3 font-semibold ${
-                    showDisponibilidad 
-                      ? 'text-blue-600 border-b-2 border-blue-600' 
-                      : 'text-gray-600 hover:text-gray-800'
-                  }`}
+                  className={`px-6 py-3 font-semibold ${showDisponibilidad
+                    ? 'text-blue-600 border-b-2 border-blue-600'
+                    : 'text-gray-600 hover:text-gray-800'
+                    }`}
                 >
                   Disponibilidad Horaria
                 </button>
@@ -401,68 +389,68 @@ const GestionProfesoresView = () => {
               {!showDisponibilidad ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Nombre</label>
+                    <label className="block text-sm font-medium text-gray-900 mb-2">Nombre</label>
                     <input
                       type="text"
                       disabled={modalMode === 'view'}
-                      className="w-full px-4 py-2 border border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+                      className="w-full px-4 py-2 border border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 text-black"
                       value={formData.nombre}
-                      onChange={(e) => setFormData({...formData, nombre: e.target.value})}
+                      onChange={(e) => setFormData({ ...formData, nombre: e.target.value })}
                     />
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Apellido</label>
+                    <label className="block text-sm font-medium text-gray-900 mb-2">Apellido</label>
                     <input
                       type="text"
                       disabled={modalMode === 'view'}
-                      className="w-full px-4 py-2 border border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+                      className="w-full px-4 py-2 border border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 text-black"
                       value={formData.apellido}
-                      onChange={(e) => setFormData({...formData, apellido: e.target.value})}
+                      onChange={(e) => setFormData({ ...formData, apellido: e.target.value })}
                     />
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">DNI</label>
+                    <label className="block text-sm font-medium text-gray-900 mb-2">DNI</label>
                     <input
                       type="text"
                       maxLength={8}
                       disabled={modalMode === 'view'}
-                      className="w-full px-4 py-2 border border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+                      className="w-full px-4 py-2 border border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 text-black"
                       value={formData.dni}
-                      onChange={(e) => setFormData({...formData, dni: e.target.value})}
+                      onChange={(e) => setFormData({ ...formData, dni: e.target.value })}
                     />
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Correo</label>
+                    <label className="block text-sm font-medium text-gray-900 mb-2">Correo</label>
                     <input
                       type="email"
                       disabled={modalMode === 'view'}
-                      className="w-full px-4 py-2 border border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+                      className="w-full px-4 py-2 border border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 text-black"
                       value={formData.correo}
-                      onChange={(e) => setFormData({...formData, correo: e.target.value})}
+                      onChange={(e) => setFormData({ ...formData, correo: e.target.value })}
                     />
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Teléfono</label>
+                    <label className="block text-sm font-medium text-gray-900 mb-2">Teléfono</label>
                     <input
                       type="tel"
                       disabled={modalMode === 'view'}
-                      className="w-full px-4 py-2 border border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+                      className="w-full px-4 py-2 border border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 text-black"
                       value={formData.telefono}
-                      onChange={(e) => setFormData({...formData, telefono: e.target.value})}
+                      onChange={(e) => setFormData({ ...formData, telefono: e.target.value })}
                     />
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Categoría</label>
+                    <label className="block text-sm font-medium text-gray-900 mb-2">Categoría</label>
                     <select
                       disabled={modalMode === 'view'}
-                      className="w-full px-4 py-2 border border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+                      className="w-full px-4 py-2 border border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 text-black"
                       value={formData.categoria}
-                      onChange={(e) => setFormData({...formData, categoria: e.target.value})}
+                      onChange={(e) => setFormData({ ...formData, categoria: e.target.value })}
                     >
                       <option value="ordinario">Ordinario</option>
                       <option value="contratado">Contratado</option>
@@ -471,25 +459,25 @@ const GestionProfesoresView = () => {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Carga Horaria Máxima</label>
+                    <label className="block text-sm font-medium text-gray-900 mb-2">Carga Horaria Máxima</label>
                     <input
                       type="number"
                       min="1"
                       max="40"
                       disabled={modalMode === 'view'}
-                      className="w-full px-4 py-2 border border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+                      className="w-full px-4 py-2 border border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 text-black"
                       value={formData.cargaMaxima}
-                      onChange={(e) => setFormData({...formData, cargaMaxima: parseInt(e.target.value)})}
+                      onChange={(e) => setFormData({ ...formData, cargaMaxima: parseInt(e.target.value) })}
                     />
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Estado</label>
+                    <label className="block text-sm font-medium text-gray-900 mb-2">Estado</label>
                     <select
                       disabled={modalMode === 'view'}
-                      className="w-full px-4 py-2 border border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+                      className="w-full px-4 py-2 border border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 text-black"
                       value={formData.estado}
-                      onChange={(e) => setFormData({...formData, estado: e.target.value})}
+                      onChange={(e) => setFormData({ ...formData, estado: e.target.value })}
                     >
                       <option value="activo">Activo</option>
                       <option value="inactivo">Inactivo</option>
@@ -510,7 +498,7 @@ const GestionProfesoresView = () => {
                             {dia}
                           </div>
                         ))}
-                        
+
                         {horas.map(hora => (
                           <React.Fragment key={hora}>
                             <div className="bg-blue-50 p-2 rounded text-xs font-medium text-center flex items-center justify-center">
@@ -525,11 +513,10 @@ const GestionProfesoresView = () => {
                                   type="button"
                                   onClick={() => toggleDisponibilidad(dia, hora)}
                                   disabled={modalMode === 'view'}
-                                  className={`p-2 rounded text-xs transition ${
-                                    isDisponible
-                                      ? 'bg-green-500 text-white hover:bg-green-600'
-                                      : 'bg-gray-100 hover:bg-gray-200'
-                                  } ${modalMode === 'view' ? 'cursor-not-allowed' : 'cursor-pointer'}`}
+                                  className={`p-2 rounded text-xs transition ${isDisponible
+                                    ? 'bg-green-500 text-white hover:bg-green-600'
+                                    : 'bg-gray-100 hover:bg-gray-200'
+                                    } ${modalMode === 'view' ? 'cursor-not-allowed' : 'cursor-pointer'}`}
                                 >
                                   {isDisponible ? '✓' : ''}
                                 </button>

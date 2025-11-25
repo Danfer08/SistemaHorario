@@ -83,9 +83,13 @@ const AppContent = () => {
     );
 };
 
+import { ToastProvider } from "./contexts/ToastContext";
+
 const App = () => (
     <AuthProvider>
-        <AppContent />
+        <ToastProvider>
+            <AppContent />
+        </ToastProvider>
     </AuthProvider>
 );
 

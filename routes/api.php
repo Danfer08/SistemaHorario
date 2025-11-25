@@ -37,6 +37,8 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::delete('/{id}/eliminar-asignacion', [HorarioController::class, 'eliminarAsignacion']);
         Route::get('/{id}/validar-conflictos', [HorarioController::class, 'validarConflictosHorario']);
         Route::post('/{id}/publicar', [HorarioController::class, 'publicar']);
+        Route::post('/{id}/generar-automatico', [HorarioController::class, 'generarAutomatico']);
+        Route::post('/{id}/actualizar-asignacion', [HorarioController::class, 'actualizarAsignacion']);
     });
 
     Route::prefix('usuarios')->group(function () {
@@ -47,7 +49,7 @@ Route::middleware('auth:sanctum')->group(function () {
     });
 
 
-    
+
 
     // Rutas para la gestión de profesores
     Route::prefix('profesores')->group(function () {
@@ -74,7 +76,29 @@ Route::middleware('auth:sanctum')->group(function () {
 
 // Cursos por ciclo para el front
 Route::middleware('auth:sanctum')->get('/cursos/ciclo/{ciclo}', function ($ciclo) {
-    $cursos = Curso::where('ciclo', (string)$ciclo)->get();
+    $cursos = Curso::where('ciclo', (string) $ciclo)->get();
+    return response()->json(['data' => $cursos]);
+});
+
+// Cursos irregulares (ciclo opuesto)
+Route::middleware('auth:sanctum')->get('/cursos/irregulares/{ciclo}', function ($ciclo) {
+    $cicloNum = (int) $ciclo;
+    $esPar = $cicloNum % 2 === 0;
+
+    // Si es par, buscamos impares. Si es impar, buscamos pares.
+    // Ciclos: 1, 2, 3, 4, 5, 6, 7, 8, 9, 10
+
+    $query = Curso::query();
+
+    if ($esPar) {
+        // Es par (2, 4...), traer impares (1, 3, 5, 7, 9)
+        $query->whereIn('ciclo', ['1', '3', '5', '7', '9']);
+    } else {
+        // Es impar (1, 3...), traer pares (2, 4, 6, 8, 10)
+        $query->whereIn('ciclo', ['2', '4', '6', '8', '10']);
+    }
+
+    $cursos = $query->get();
     return response()->json(['data' => $cursos]);
 });
 
@@ -85,7 +109,9 @@ Route::middleware('auth:sanctum')->get('/cursos', function () {
         'total' => $cursos->count(),
         'obligatorios' => $cursos->where('tipo_curso', 'obligatorio')->count(),
         'electivos' => $cursos->where('tipo_curso', 'electivo')->count(),
-        'total_horas' => $cursos->sum(function ($c) { return (int)($c->horas_totales ?? 0); })
+        'total_horas' => $cursos->sum(function ($c) {
+            return (int) ($c->horas_totales ?? 0);
+        })
     ];
     return response()->json(['data' => $cursos, 'stats' => $stats]);
 });

@@ -2,9 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { Factory, Plus, Search, Edit, Trash2, Eye, X, Users, Monitor, CheckCircle, XCircle, Loader } from 'lucide-react';
 import apiClient from '../../api/apiConfig';
 import { useAuth } from '../../contexts/AuthContext';
+import { useToast } from '../../contexts/ToastContext';
 
 const GestionSalonesView = () => {
   const { user } = useAuth();
+  const { showToast } = useToast();
   const [showModal, setShowModal] = useState(false);
   const [modalMode, setModalMode] = useState('create');
   const [selectedSalon, setSelectedSalon] = useState(null);
@@ -12,7 +14,6 @@ const GestionSalonesView = () => {
   const [filterTipo, setFilterTipo] = useState('');
   const [filterEstado, setFilterEstado] = useState('');
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
 
   const [salones, setSalones] = useState([]);
   const [stats, setStats] = useState({
@@ -62,9 +63,8 @@ const GestionSalonesView = () => {
         deshabilitados: total - habilitados
       });
 
-      setError(null);
     } catch (err) {
-      setError(err.response?.data?.message || 'Error al cargar los salones');
+      showToast(err.response?.data?.message || 'Error al cargar los salones', 'error');
       console.error('Error al cargar salones:', err);
     } finally {
       setLoading(false);
@@ -74,31 +74,29 @@ const GestionSalonesView = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
-    setError(null);
-    
+
     try {
       if (modalMode === 'create') {
-        const response = await apiClient.post('/salones', formData);
-        if (response.data.status === 'success') {
-          await cargarSalones();
-          setShowModal(false);
-          resetForm();
-        }
+        await apiClient.post('/salones', formData);
+        showToast('Salón creado exitosamente', 'success');
+        await cargarSalones();
+        setShowModal(false);
+        resetForm();
       } else {
-        const response = await apiClient.put(`/salones/${selectedSalon.idSalon}`, formData);
-        if (response.data.status === 'success') {
-          await cargarSalones();
-          setShowModal(false);
-          resetForm();
-        }
+        await apiClient.put(`/salones/${selectedSalon.idSalon}`, formData);
+        showToast('Salón actualizado exitosamente', 'success');
+        await cargarSalones();
+        setShowModal(false);
+        resetForm();
       }
     } catch (err) {
       console.error('Error al guardar salón:', err);
-      setError(err.response?.data?.message || 'Error al guardar el salón');
+      const msg = err.response?.data?.message || 'Error al guardar el salón';
+      showToast(msg, 'error');
       if (err.response?.data?.errors) {
         // Mostrar errores de validación específicos
         const validationErrors = Object.values(err.response.data.errors).flat();
-        setError(validationErrors.join('\n'));
+        validationErrors.forEach(error => showToast(error, 'error'));
       }
     } finally {
       setLoading(false);
@@ -106,15 +104,21 @@ const GestionSalonesView = () => {
   };
 
   const handleDelete = async (id) => {
-    if (!window.confirm('¿Estás seguro de eliminar este salón?')) return;
-    
+    if (!id) {
+      showToast('Error: Identificador de salón no válido', 'error');
+      return;
+    }
+
+    if (!window.confirm('¿Estás seguro de deshabilitar este salón?')) return;
+
     setLoading(true);
     try {
       await apiClient.delete(`/salones/${id}`);
+      showToast('Salón deshabilitado exitosamente', 'success');
       await cargarSalones();
-      setError(null);
     } catch (err) {
-      setError(err.response?.data?.message || 'Error al eliminar el salón');
+      const msg = err.response?.data?.message || err.message || 'Error al eliminar el salón';
+      showToast('Error: ' + msg, 'error');
       console.error('Error al eliminar salón:', err);
     } finally {
       setLoading(false);
@@ -268,18 +272,7 @@ const GestionSalonesView = () => {
       </div>
 
       {/* Mensaje de error */}
-      {error && (
-        <div className="mb-8 bg-red-50 border-l-4 border-red-500 p-4 rounded">
-          <div className="flex items-center">
-            <div className="flex-shrink-0">
-              <XCircle className="h-5 w-5 text-red-400" />
-            </div>
-            <div className="ml-3">
-              <p className="text-sm text-red-700">{error}</p>
-            </div>
-          </div>
-        </div>
-      )}
+
 
       {/* Loading */}
       {loading && (
@@ -313,20 +306,18 @@ const GestionSalonesView = () => {
                     <div className="text-sm text-gray-900">{salon.capacidad} personas</div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                      salon.tipo === 'laboratorio' 
-                        ? 'bg-purple-100 text-purple-800' 
-                        : 'bg-blue-100 text-blue-800'
-                    }`}>
+                    <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${salon.tipo === 'laboratorio'
+                      ? 'bg-purple-100 text-purple-800'
+                      : 'bg-blue-100 text-blue-800'
+                      }`}>
                       {salon.tipo}
                     </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                      salon.disponibilidad === 'habilitado'
-                        ? 'bg-green-100 text-green-800'
-                        : 'bg-red-100 text-red-800'
-                    }`}>
+                    <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${salon.disponibilidad === 'habilitado'
+                      ? 'bg-green-100 text-green-800'
+                      : 'bg-red-100 text-red-800'
+                      }`}>
                       {salon.disponibilidad}
                     </span>
                   </td>
@@ -353,8 +344,9 @@ const GestionSalonesView = () => {
                       <Edit className="h-5 w-5" />
                     </button>
                     <button
-                      onClick={() => handleDelete(salon.idSalon || salon.id)}
+                      onClick={() => handleDelete(salon.idSalon)}
                       className="text-black hover:bg-gray-100 p-1 rounded"
+                      title="Deshabilitar Salón"
                     >
                       <Trash2 className="h-5 w-5" />
                     </button>
@@ -369,135 +361,94 @@ const GestionSalonesView = () => {
       {/* Modal */}
       {showModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 overflow-y-auto">
-          <div className="bg-white rounded-xl shadow-2xl max-w-lg w-full my-8">
-              <form onSubmit={handleSubmit}>
-                <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
-                  <div className="mb-4">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Código
+          <div className="bg-white rounded-xl shadow-2xl max-w-lg w-full my-8 max-h-[90vh] overflow-y-auto">
+            <form onSubmit={handleSubmit}>
+              <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                <div className="grid grid-cols-2 gap-4 mb-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-900 mb-2">
+                      Capacidad
                     </label>
                     <input
-                      type="text"
-                      name="codigo"
-                      value={formData.codigo}
+                      type="number"
+                      name="capacidad"
+                      value={formData.capacidad}
                       onChange={handleInputChange}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 text-black"
                       required
                     />
                   </div>
-                  <div className="grid grid-cols-2 gap-4 mb-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Capacidad
-                      </label>
-                      <input
-                        type="number"
-                        name="capacidad"
-                        value={formData.capacidad}
-                        onChange={handleInputChange}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
-                        required
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Tipo
-                      </label>
-                      <select
-                        name="tipo"
-                        value={formData.tipo}
-                        onChange={handleInputChange}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
-                      >
-                        <option value="normal">Normal</option>
-                        <option value="laboratorio">Laboratorio</option>
-                      </select>
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4 mb-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Pabellón
-                      </label>
-                      <input
-                        type="text"
-                        name="pabellon"
-                        value={formData.pabellon}
-                        onChange={handleInputChange}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
-                        required
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Piso
-                      </label>
-                      <input
-                        type="text"
-                        name="piso"
-                        value={formData.piso}
-                        onChange={handleInputChange}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
-                        required
-                      />
-                    </div>
-                  </div>
-                  <div className="mb-4">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Estado
+                  <div>
+                    <label className="block text-sm font-medium text-gray-900 mb-2">
+                      Tipo
                     </label>
                     <select
-                      name="disponibilidad"
-                      value={formData.disponibilidad}
+                      name="tipo"
+                      value={formData.tipo}
                       onChange={handleInputChange}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 text-black"
                     >
-                      <option value="habilitado">Habilitado</option>
-                      <option value="deshabilitado">Deshabilitado</option>
+                      <option value="normal">Normal</option>
+                      <option value="laboratorio">Laboratorio</option>
                     </select>
                   </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Equipamiento
-                    </label>
-                    <div className="grid grid-cols-2 gap-2">
-                      {equipamientoOpciones.map((item) => (
-                        <label key={item} className="inline-flex items-center">
-                          <input
-                            type="checkbox"
-                            checked={formData.equipamiento.includes(item)}
-                            onChange={() => handleEquipamientoChange(item)}
-                            className="rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50"
-                          />
-                          <span className="ml-2 text-sm text-gray-700">{item}</span>
-                        </label>
-                      ))}
-                    </div>
+                </div>
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-gray-900 mb-2">
+                    Estado
+                  </label>
+                  <select
+                    name="disponibilidad"
+                    value={formData.disponibilidad}
+                    onChange={handleInputChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 text-black"
+                  >
+                    <option value="habilitado">Habilitado</option>
+                    <option value="deshabilitado">Deshabilitado</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-900 mb-2">
+                    Equipamiento
+                  </label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {equipamientoOpciones.map((item) => (
+                      <label key={item} className="inline-flex items-center">
+                        <input
+                          type="checkbox"
+                          checked={formData.equipamiento.includes(item)}
+                          onChange={() => handleEquipamientoChange(item)}
+                          className="rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50"
+                        />
+                        <span className="ml-2 text-sm text-gray-700">{item}</span>
+                      </label>
+                    ))}
                   </div>
                 </div>
-                <div className="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
-                  <button
-                    type="submit"
-                    className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:ml-3 sm:w-auto sm:text-sm"
-                    disabled={loading}
-                  >
-                    {loading ? (
-                      <span className="inline-flex items-center"><Loader className="w-4 h-4 mr-2 animate-spin" />Guardando...</span>
-                    ) : (
-                      modalMode === 'create' ? 'Crear Salón' : 'Actualizar Salón'
-                    )}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setShowModal(false)}
-                    className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
-                  >
-                    Cancelar
-                  </button>
-                </div>
-              </form>
-            </div>
+              </div>
+              <div className="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                <button
+                  type="submit"
+                  className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:ml-3 sm:w-auto sm:text-sm"
+                  disabled={loading}
+                >
+                  {loading ? (
+                    <span className="inline-flex items-center"><Loader className="w-4 h-4 mr-2 animate-spin" />Guardando...</span>
+                  ) : (
+                    modalMode === 'create' ? 'Crear Salón' : 'Actualizar Salón'
+                  )}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowModal(false)}
+                  className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
+                >
+                  Cancelar
+                </button>
+              </div>
+            </form>
           </div>
+        </div>
       )}
     </div>
   );

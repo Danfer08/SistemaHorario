@@ -10,7 +10,7 @@ class SalonController extends Controller
 {
     public function index()
     {
-        $salones = Salon::where('disponibilidad', 'habilitado')->get();
+        $salones = Salon::all();
         return response()->json(['data' => $salones]);
     }
 
@@ -19,7 +19,8 @@ class SalonController extends Controller
         $request->validate([
             'tipo' => 'required|in:laboratorio,normal',
             'capacidad' => 'required|integer|min:1',
-            'disponibilidad' => 'required|in:habilitado,deshabilitado'
+            'disponibilidad' => 'required|in:habilitado,deshabilitado',
+            'equipamiento' => 'nullable|array'
         ]);
 
         $salon = Salon::create($request->all());
@@ -33,7 +34,8 @@ class SalonController extends Controller
         $request->validate([
             'tipo' => 'required|in:laboratorio,normal',
             'capacidad' => 'required|integer|min:1',
-            'disponibilidad' => 'required|in:habilitado,deshabilitado'
+            'disponibilidad' => 'required|in:habilitado,deshabilitado',
+            'equipamiento' => 'nullable|array'
         ]);
 
         $salon->update($request->all());
@@ -43,9 +45,26 @@ class SalonController extends Controller
     public function destroy($id)
     {
         $salon = Salon::findOrFail($id);
-        $salon->disponibilidad = 'deshabilitado';
-        $salon->save();
-        return response()->json(['message' => 'Salón deshabilitado']);
+
+        if ($salon->disponibilidad === 'habilitado') {
+            $salon->disponibilidad = 'deshabilitado';
+            $salon->save();
+            return response()->json(['message' => 'Salón deshabilitado exitosamente']);
+        } else {
+            // Si ya está deshabilitado, intentamos eliminarlo físicamente
+            try {
+                $salon->delete();
+                return response()->json(['message' => 'Salón eliminado permanentemente']);
+            } catch (\Illuminate\Database\QueryException $e) {
+                // Error de integridad referencial (FK)
+                if ($e->getCode() == 23000) {
+                    return response()->json([
+                        'message' => 'No se puede eliminar el salón porque tiene horarios asignados. Solo se mantendrá deshabilitado.'
+                    ], 409); // 409 Conflict
+                }
+                throw $e;
+            }
+        }
     }
 
     public function disponibles()

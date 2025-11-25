@@ -24,13 +24,9 @@
 <body class="bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-gray-100 min-h-screen flex flex-col">
 
     {{-- React se monta aquí --}}
-    <main class="flex-1 p-6">
+    <main class="flex-1">
         <div id="app"></div>
     </main>
 
-    {{-- Footer --}}
-    <footer class="bg-gray-200 dark:bg-gray-800 text-center py-3 text-sm">
-        © {{ date('Y') }} - Sistema de Horarios | UNAP
-    </footer>
 </body>
 </html>

@@ -1,6 +1,6 @@
 // views/CrearHorarioView.js
 import React from 'react';
-import { Clock, CheckCircle, Loader, AlertTriangle } from 'lucide-react';
+import { Clock, CheckCircle, Loader, AlertTriangle, Sparkles } from 'lucide-react';
 
 // Hooks y componentes
 import { useHorario } from '../crearHorario/hook/horarioHooks';
@@ -10,6 +10,7 @@ import ConfiguracionPeriodo from '../crearHorario/others/configPeriodo';
 import Alertas from '../crearHorario/others/alerts';
 import ModalPlanificadorGrupos from './ModalPlanificadorGrupos';
 import ModalAsignarSesion from './ModalAsignarSesion';
+import ModalEditarAsignacion from './ModalEditarAsignacion';
 
 const CrearHorarioView = ({ horarioId }) => {
   const {
@@ -40,9 +41,17 @@ const CrearHorarioView = ({ horarioId }) => {
     handleEliminarAsignacion,
     handleGuardarPlanificacion,
     handleAbrirPlanificador,
-    handleAsignarSesion,    
+    handleAsignarSesion,
     validarConflictos,
-    publicarHorario
+    publicarHorario,
+    showIrregulares,
+    toggleIrregulares,
+    generarHorarioAutomatico,
+    showEditarModal,
+    setShowEditarModal,
+    asignacionParaEditar,
+    handleEditarAsignacion,
+    guardarEdicionAsignacion
   } = useHorario(horarioId);
 
   return (
@@ -60,95 +69,115 @@ const CrearHorarioView = ({ horarioId }) => {
 
       {/* Ocultar contenido principal mientras carga para evitar parpadeos */}
       <div style={{ visibility: loading && horarioId ? 'hidden' : 'visible' }}>
-      {/* Header */}
-      <div className="mb-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <div className="flex items-center gap-3 mb-2">
-              <Clock className="w-8 h-8 text-blue-600" />
-              <h1 className="text-3xl font-bold text-gray-800">Crear Horario</h1>
+        {/* Header */}
+        <div className="mb-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="flex items-center gap-3 mb-2">
+                <Clock className="w-8 h-8 text-blue-600" />
+                <h1 className="text-3xl font-bold text-gray-800">Crear Horario</h1>
+              </div>
+              <p className="text-gray-600">Sistema de asignación de horarios con validaciones automáticas</p>
             </div>
-            <p className="text-gray-600">Sistema de asignación de horarios con validaciones automáticas</p>
-          </div>
-          <div className="flex gap-3">
-            <button 
-              onClick={validarConflictos}
-              className="flex items-center gap-2 px-4 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 transition"
-            >
-              <AlertTriangle className="w-4 h-4" />
-              Validar Conflictos
-            </button>
-            <button 
-              onClick={publicarHorario}
-              disabled={loading}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition disabled:opacity-50"
-            >
-              {loading ? <Loader className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4" />}
-              Publicar Horario
-            </button>
+            <div className="flex gap-3">
+              <button
+                onClick={validarConflictos}
+                className="flex items-center gap-2 px-4 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 transition"
+              >
+                <AlertTriangle className="w-4 h-4" />
+                Validar Conflictos
+              </button>
+              <button
+                onClick={generarHorarioAutomatico}
+                disabled={loading}
+                className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition disabled:opacity-50"
+              >
+                {loading ? <Loader className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+                Creación de Horario Automática
+              </button>
+              <button
+                onClick={publicarHorario}
+                disabled={loading}
+                className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition disabled:opacity-50"
+              >
+                {loading ? <Loader className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4" />}
+                Publicar Horario
+              </button>
+            </div>
           </div>
         </div>
-      </div>
 
-      {/* Configuración */}
-      <ConfiguracionPeriodo 
-        selectedPeriodo={selectedPeriodo}
-        setSelectedPeriodo={setSelectedPeriodo}
-        selectedCiclo={selectedCiclo}
-        setSelectedCiclo={setSelectedCiclo}
-        isEditing={true} // Deshabilitar selectores
-      />
-
-      {/* Alertas */}
-      <Alertas error={error} conflictos={conflictos} />
-
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-        {/* Panel Lateral - Cursos Disponibles */}
-        <PanelCursos
-          cursosAsignados={cursosAsignados} 
-          cursosPendientes={cursosPendientes}
-          cursosDisponibles={cursosDisponibles}
-          profesores={profesores}
-          planificaciones={planificaciones}
-          handleAbrirPlanificador={handleAbrirPlanificador}
-          handleDragStart={handleDragStart}
+        {/* Configuración */}
+        <ConfiguracionPeriodo
+          selectedPeriodo={selectedPeriodo}
+          setSelectedPeriodo={setSelectedPeriodo}
+          selectedCiclo={selectedCiclo}
+          setSelectedCiclo={setSelectedCiclo}
+          isEditing={true} // Deshabilitar selectores
         />
 
-        {/* Grid de Horario */}
-        <div className="lg:col-span-3">
-          <div className="bg-white rounded-xl shadow-md p-6 overflow-x-auto">
-            <h3 className="text-lg font-semibold text-gray-800 mb-4">
-              Horario - {selectedCiclo}° Ciclo | {selectedPeriodo.año}-{selectedPeriodo.etapa}
-            </h3>
+        {/* Alertas */}
+        <Alertas error={error} conflictos={conflictos} />
 
-            <HorarioGrid 
-              horarioGrid={horarioGrid}
-              handleDrop={handleDrop}
-              handleEliminarAsignacion={handleEliminarAsignacion}
-              selectedCiclo={selectedCiclo}
-              selectedPeriodo={selectedPeriodo}
-            />
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+          {/* Panel Lateral - Cursos Disponibles */}
+          <PanelCursos
+            cursosAsignados={cursosAsignados}
+            cursosPendientes={cursosPendientes}
+            cursosDisponibles={cursosDisponibles}
+            profesores={profesores}
+            planificaciones={planificaciones}
+            handleAbrirPlanificador={handleAbrirPlanificador}
+            handleDragStart={handleDragStart}
+            showIrregulares={showIrregulares}
+            toggleIrregulares={toggleIrregulares}
+          />
+
+          {/* Grid de Horario */}
+          <div className="lg:col-span-3">
+            <div className="bg-white rounded-xl shadow-md p-6 overflow-x-auto">
+              <h3 className="text-lg font-semibold text-gray-800 mb-4">
+                Horario - {selectedCiclo}° Ciclo | {selectedPeriodo.año}-{selectedPeriodo.etapa}
+              </h3>
+
+              <HorarioGrid
+                horarioGrid={horarioGrid}
+                handleDrop={handleDrop}
+                handleEliminarAsignacion={handleEliminarAsignacion}
+                handleEditarAsignacion={handleEditarAsignacion}
+                selectedCiclo={selectedCiclo}
+                selectedPeriodo={selectedPeriodo}
+              />
+            </div>
           </div>
         </div>
-      </div>
 
-      {/* Modal para Planificar Grupos y Sesiones */}
-      <ModalPlanificadorGrupos
-        show={showPlanificadorModal}
-        onClose={() => setShowPlanificadorModal(false)}
-        curso={cursoParaPlanificar}
-        profesores={profesores}
-        onSavePlanificacion={handleGuardarPlanificacion}
-      />
+        {/* Modal para Planificar Grupos y Sesiones */}
+        <ModalPlanificadorGrupos
+          show={showPlanificadorModal}
+          onClose={() => setShowPlanificadorModal(false)}
+          curso={cursoParaPlanificar}
+          profesores={profesores}
+          onSavePlanificacion={handleGuardarPlanificacion}
+        />
 
-      {/* Modal para Asignar Salón a una Sesión */}
-      <ModalAsignarSesion
-        show={showAsignarSesionModal}
-        onClose={() => setShowAsignarSesionModal(false)}
-        sesion={sesionParaAsignar}
-        salones={salones}
-        onAsignar={handleAsignarSesion}
-      />
+        {/* Modal para Asignar Salón a una Sesión */}
+        <ModalAsignarSesion
+          show={showAsignarSesionModal}
+          onClose={() => setShowAsignarSesionModal(false)}
+          sesion={sesionParaAsignar}
+          salones={salones}
+          onAsignar={handleAsignarSesion}
+        />
+
+        {/* Modal para Editar Asignación (Profesor) */}
+        <ModalEditarAsignacion
+          show={showEditarModal}
+          onClose={() => setShowEditarModal(false)}
+          asignacion={asignacionParaEditar}
+          profesores={profesores}
+          onSave={guardarEdicionAsignacion}
+        />
       </div>
     </div>
   );
