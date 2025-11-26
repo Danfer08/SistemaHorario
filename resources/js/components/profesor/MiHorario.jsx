@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, Clock, Users, MapPin, Download, AlertCircle, Send, BookOpen } from 'lucide-react';
+import { Calendar, Clock, Users, MapPin, Download, AlertCircle, Send, BookOpen, ShieldAlert } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { ProfesorService } from '../../services/api';
 import jsPDF from 'jspdf';
@@ -16,6 +16,21 @@ const MiHorarioView = () => {
 
   const dias = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
   const horas = ['07:00', '08:00', '09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00', '18:00', '19:00', '20:00', '21:00', '22:00', '23:00'];
+
+  // Verificar si el usuario tiene el rol de "profesor"
+  const esProfesor = user && user.roles && user.roles.includes('profesor');
+
+  if (!esProfesor) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-yellow-50 to-white p-6 flex items-center justify-center">
+        <div className="text-center bg-white p-8 rounded-xl shadow-md">
+          <ShieldAlert className="w-16 h-16 text-yellow-500 mx-auto mb-4" />
+          <h2 className="text-2xl font-bold text-gray-800 mb-2">Acceso Inválido</h2>
+          <p className="text-gray-600">Esta sección está disponible únicamente para usuarios con el rol de "Profesor".</p>
+        </div>
+      </div>
+    );
+  }
 
   // Cargar horarios del profesor
   useEffect(() => {

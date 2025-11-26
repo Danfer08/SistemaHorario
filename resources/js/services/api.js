@@ -112,4 +112,34 @@ export const SalonService = {
         const response = await axios.get(`${baseURL}/salones-disponibles`);
         return response.data;
     }
+
+
+};
+
+export const othersRoles = {
+    getAll: async () => {
+        try {
+            const response = await axios.get('/api/roles');
+            return response.data;
+        } catch (error) {
+            console.error("Error en RolesServicio.getAll:", error);
+            throw error;
+        }
+    },
+
+    getPermissions: async () => {
+        try {
+            const response = await axios.get('/api/roles/permisos');
+            return response.data;
+        } catch (error) {
+            console.error("Error en RolesServicio.getPermissions:", error);
+            throw error;
+        }
+    },
+
+    create: (data) => axios.post('/api/roles', data),
+
+    update: (id, data) => axios.put(`/api/roles/${id}`, data),
+
+    delete: (id) => axios.delete(`/api/roles/${id}`),
 };

@@ -8,6 +8,7 @@ use App\Http\Controllers\ProfesorController;
 use App\Http\Controllers\SalonController;
 use App\Http\Controllers\CursoController;
 use App\Http\Controllers\UserController;
+use App\Http\Controllers\RolController;
 use App\Models\Curso;
 
 
@@ -40,6 +41,17 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/{id}/generar-automatico', [HorarioController::class, 'generarAutomatico']);
         Route::post('/{id}/actualizar-asignacion', [HorarioController::class, 'actualizarAsignacion']);
     });
+
+    //Roles
+    Route::prefix('roles')->group(function () {
+        Route::get('/', [RolController::class, 'index']);
+        Route::post('/', [RolController::class, 'store']);
+        Route::get('/permisos', [RolController::class, 'getPermissions']);
+        Route::put('/{id}', [RolController::class, 'update']);
+        Route::delete('/{id}', [RolController::class, 'destroy']);
+    });
+
+    // Rutas para la gestión de usuarios
 
     Route::prefix('usuarios')->group(function () {
         Route::get('/', [UserController::class, 'index']);

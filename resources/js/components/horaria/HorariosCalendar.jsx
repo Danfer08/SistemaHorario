@@ -1,18 +1,15 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Calendar, Filter, Download, Eye, Search, Loader } from 'lucide-react';
 import apiClient from '../../api/api';
-import { useAcademicYears } from '../../utils/yearsHorario';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
 const HorariosView = () => {
 
-  const { years, defaultYear } = useAcademicYears();
   const [filters, setFilters] = useState({
-    año: defaultYear,
+    año: new Date().getFullYear().toString(),
     etapa: 'I',
     ciclo: '1',
-    grupo: '1'
   });
 
 
@@ -20,6 +17,11 @@ const HorariosView = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [horariosDisponibles, setHorariosDisponibles] = useState([]);
+
+  // Listas dinámicas para los filtros
+  const [añosDisponibles, setAñosDisponibles] = useState([]);
+  const [etapasDisponibles, setEtapasDisponibles] = useState([]);
+
 
   const horas = ['07:00', '08:00', '09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00', '18:00', '19:00', '20:00', '21:00', '22:00', '23:00'];
   const dias = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
@@ -51,6 +53,26 @@ const HorariosView = () => {
       console.log('Respuesta completa:', response);
 
       setHorariosDisponibles(response.data.data);
+
+      // Procesar horarios para los filtros
+      const horariosConfirmados = response.data.data.filter(h => h.estado === 'confirmado');
+      
+      const añosUnicos = [...new Set(horariosConfirmados.map(h => h.año.toString()))].sort((a, b) => b - a);
+      setAñosDisponibles(añosUnicos);
+
+      if (añosUnicos.length > 0) {
+        const añoActual = new Date().getFullYear().toString();
+        const añoPorDefecto = añosUnicos.includes(añoActual) ? añoActual : añosUnicos[0];
+        
+        setFilters(prev => ({...prev, año: añoPorDefecto}));
+
+        const etapasParaAño = [...new Set(horariosConfirmados.filter(h => h.año == añoPorDefecto).map(h => h.etapa))];
+        setEtapasDisponibles(etapasParaAño);
+
+        if(etapasParaAño.length > 0) {
+          setFilters(prev => ({...prev, etapa: etapasParaAño[0]}));
+        }
+      }
     } catch (error) {
       console.error('Error al cargar horarios:', error);
       setError('Error al cargar los horarios disponibles');
@@ -74,12 +96,8 @@ const HorariosView = () => {
       }
 
       // Obtener datos del grid del horario
-      const params = {
-        grupo: filters.grupo
-      };
-      
-      // Solo agregar ciclo si no es "todos"
-      if (filters.ciclo !== 'todos') {
+      const params = {};
+      if (filters.ciclo && filters.ciclo !== 'todos') {
         params.ciclo = filters.ciclo;
       }
 
@@ -97,6 +115,24 @@ const HorariosView = () => {
       setLoading(false);
     }
   };
+
+  // Actualizar etapas cuando cambia el año
+  useEffect(() => {
+    if (filters.año && horariosDisponibles.length > 0) {
+      const etapasParaAño = [...new Set(horariosDisponibles.filter(h => h.año == filters.año && h.estado === 'confirmado').map(h => h.etapa))];
+      setEtapasDisponibles(etapasParaAño);
+      // Si la etapa actual no está en la nueva lista, seleccionar la primera disponible
+      if (!etapasParaAño.includes(filters.etapa) && etapasParaAño.length > 0) {
+        setFilters(prev => ({ ...prev, etapa: etapasParaAño[0] }));
+      }
+    }
+  }, [filters.año, horariosDisponibles]);
+
+  // Actualizar ciclo cuando cambia la etapa
+  useEffect(() => {
+    const primerCicloValido = filters.etapa === 'I' ? '1' : '2';
+    setFilters(prev => ({ ...prev, ciclo: primerCicloValido }));
+  }, [filters.etapa]);
 
   const handleBuscar = () => {
     buscarHorario();
@@ -119,7 +155,7 @@ const HorariosView = () => {
 
     doc.setFontSize(12);
     doc.setTextColor(100, 100, 100);
-    doc.text(`Ciclo: ${filters.ciclo}° | Grupo: ${filters.grupo} | Periodo: ${filters.año}-${filters.etapa}`, 14, 32);
+    doc.text(`Ciclo: ${filters.ciclo}° | Periodo: ${filters.año}-${filters.etapa}`, 14, 32);
 
     // Preparar datos para la tabla
     const tableBody = [];
@@ -201,7 +237,7 @@ const HorariosView = () => {
       }
     });
 
-    doc.save(`horario-${filters.año}-${filters.etapa}-ciclo${filters.ciclo}-grupo${filters.grupo}.pdf`);
+    doc.save(`horario-${filters.año}-${filters.etapa}-ciclo${filters.ciclo}.pdf`);
   };
 
   const getDuracionEnHoras = (horaInicio, horaFin) => {
@@ -224,6 +260,12 @@ const HorariosView = () => {
     return grid;
   }, [horarioData]);
 
+  const ciclosDisponibles = useMemo(() => {
+    const todos = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+    if (filters.etapa === 'I') return todos.filter(c => c % 2 !== 0);
+    if (filters.etapa === 'II') return todos.filter(c => c % 2 === 0);
+    return [];
+  }, [filters.etapa]);
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-white p-6">
       {/* Header */}
@@ -249,11 +291,11 @@ const HorariosView = () => {
             <select
               className="w-full px-4 py-2 border text-gray-900 border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
               value={filters.año}
-              onChange={(e) => setFilters({ ...filters, año: e.target.value })}
+              onChange={(e) => setFilters(prev => ({ ...prev, año: e.target.value }))}
             >
-              {years.map(year => (
-                <option key={year} value={year.toString()}>
-                  {year}
+              {añosDisponibles.map(año => (
+                <option key={año} value={año}>
+                  {año}
                 </option>
               ))}
             </select>
@@ -264,10 +306,11 @@ const HorariosView = () => {
             <select
               className="w-full px-4 py-2 border border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
               value={filters.etapa}
-              onChange={(e) => setFilters({ ...filters, etapa: e.target.value })}
+              onChange={(e) => setFilters(prev => ({ ...prev, etapa: e.target.value }))}
             >
-              <option value="I">I</option>
-              <option value="II">II</option>
+              {etapasDisponibles.map(etapa => (
+                <option key={etapa} value={etapa}>{etapa}</option>
+              ))}
             </select>
 
           </div>
@@ -280,8 +323,8 @@ const HorariosView = () => {
               onChange={(e) => setFilters({ ...filters, ciclo: e.target.value })}
             >
               <option value="todos">Todos los ciclos</option>
-              {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(c => (
-                <option key={c} value={c}>{c}° Ciclo</option>
+              {ciclosDisponibles.map(c => (
+                <option key={c} value={c.toString()}>{c}° Ciclo</option>
               ))}
             </select>
           </div>

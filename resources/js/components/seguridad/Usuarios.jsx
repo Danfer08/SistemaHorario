@@ -12,7 +12,6 @@ const GestionUsuariosView = () => {
   const [usuarios, setUsuarios] = useState([]);
   const [error, setError] = useState(null);
 
-  const profesores = [];
 
   const roles = [
     { id: 1, name: 'admin', permisos: 8 },
