@@ -46,7 +46,7 @@ const CrearHorarioView = ({ horarioId }) => {
     publicarHorario,
     showIrregulares,
     toggleIrregulares,
-    generarHorarioAutomatico,
+
     showEditarModal,
     setShowEditarModal,
     asignacionParaEditar,
@@ -87,14 +87,7 @@ const CrearHorarioView = ({ horarioId }) => {
                 <AlertTriangle className="w-4 h-4" />
                 Validar Conflictos
               </button>
-              <button
-                onClick={generarHorarioAutomatico}
-                disabled={loading}
-                className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition disabled:opacity-50"
-              >
-                {loading ? <Loader className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
-                Creación de Horario Automática
-              </button>
+              {/* Button removed */}
               <button
                 onClick={publicarHorario}
                 disabled={loading}

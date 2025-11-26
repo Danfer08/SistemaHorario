@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { Calendar, Clock, Users, MapPin, Download, AlertCircle, Send, BookOpen } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { ProfesorService } from '../../services/api';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 const MiHorarioView = () => {
   const { user } = useAuth();
@@ -13,7 +15,7 @@ const MiHorarioView = () => {
   const [error, setError] = useState(null);
 
   const dias = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
-  const horas = ['07:00', '08:00', '09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00', '18:00','19:00','20:00','21:00','22:00','23:00'];
+  const horas = ['07:00', '08:00', '09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00', '18:00', '19:00', '20:00', '21:00', '22:00', '23:00'];
 
   // Cargar horarios del profesor
   useEffect(() => {
@@ -50,7 +52,7 @@ const MiHorarioView = () => {
   // Calcular estadísticas
   const calcularEstadisticas = () => {
     if (!horarioFiltrado.length) return { totalHoras: 0, totalCursos: 0, totalEstudiantes: 0 };
-    
+
     let totalHoras = 0;
     let totalCursos = 0;
     let totalEstudiantes = 0;
@@ -64,7 +66,7 @@ const MiHorarioView = () => {
           const fin = new Date(`2000-01-01T${detalle.Hora_fin}`);
           return sum + (fin - inicio) / (1000 * 60 * 60); // Convertir a horas
         }, 0);
-        
+
         totalHoras += horasCurso;
         totalEstudiantes += curso.Nr_estudiantes || 0;
         TotalEstudiantes = totalEstudiantes;
@@ -82,7 +84,7 @@ const MiHorarioView = () => {
     if (!horarioFiltrado.length) return [];
 
     const clases = [];
-    
+
     horarioFiltrado.forEach(horario => {
       horario.horario_cursos.forEach(curso => {
         curso.detalles.forEach(detalle => {
@@ -128,6 +130,88 @@ const MiHorarioView = () => {
     return grid;
   }, [misClases]);
 
+  const handleDownloadPDF = () => {
+    const doc = new jsPDF();
+
+    // Header
+    doc.setFontSize(20);
+    doc.setTextColor(41, 128, 185); // Blue color
+    doc.text('Mi Horario Semanal', 14, 22);
+
+    doc.setFontSize(12);
+    doc.setTextColor(100);
+    doc.text(`Profesor: ${user?.nombre || 'Profesor'}`, 14, 32);
+    doc.text(`Semestre: ${selectedSemestre}`, 14, 38);
+
+    // Prepare table data
+    const tableColumn = ["Hora", ...dias];
+    const tableRows = [];
+
+    horas.forEach(hora => {
+      const rowData = [hora];
+      dias.forEach(dia => {
+        const key = `${dia}-${hora}`;
+        const clase = horarioProcesado[key];
+        if (clase && clase.isStart) {
+          rowData.push(`${clase.curso}\n${clase.salon}\n${clase.grupo}`);
+        } else if (clase) {
+          rowData.push(''); // Cell is occupied but handled by rowspan in HTML, here we just leave empty or handle differently if needed for PDF
+        } else {
+          rowData.push('');
+        }
+      });
+      tableRows.push(rowData);
+    });
+
+    // We need a different approach for the PDF table to handle "rowspan" visual effect or just list classes.
+    // Since autoTable doesn't support rowspan easily in this grid format without complex config, 
+    // let's try a list format or a simplified grid. 
+    // Actually, let's try to make the grid work.
+
+    // Simplified approach: List of classes first, then grid if possible.
+    // Let's stick to a clear list of classes which is often more useful for printing.
+
+    // Alternative: Generate a list of classes
+    const listColumns = ["Curso", "Ciclo", "Grupo", "Día", "Hora Inicio", "Hora Fin", "Salón", "Estudiantes"];
+    const listRows = misClases.map(clase => [
+      clase.curso,
+      clase.ciclo,
+      clase.grupo,
+      clase.dia,
+      clase.hora,
+      clase.hora_fin,
+      clase.salon,
+      clase.estudiantes
+    ]);
+
+    // Sort by Day and Time
+    const dayOrder = { 'Lunes': 1, 'Martes': 2, 'Miércoles': 3, 'Jueves': 4, 'Viernes': 5, 'Sábado': 6 };
+    listRows.sort((a, b) => {
+      if (dayOrder[a[3]] !== dayOrder[b[3]]) {
+        return dayOrder[a[3]] - dayOrder[b[3]];
+      }
+      return a[4].localeCompare(b[4]);
+    });
+
+    autoTable(doc, {
+      head: [listColumns],
+      body: listRows,
+      startY: 45,
+      theme: 'grid',
+      headStyles: { fillColor: [41, 128, 185] },
+      styles: { fontSize: 8 },
+    });
+
+    // Add summary stats
+    const finalY = doc.lastAutoTable.finalY || 45;
+    doc.setFontSize(10);
+    doc.text(`Total Horas: ${stats.totalHoras}`, 14, finalY + 10);
+    doc.text(`Total Cursos: ${stats.totalCursos}`, 14, finalY + 16);
+    doc.text(`Total Estudiantes: ${stats.totalEstudiantes}`, 14, finalY + 22);
+
+    doc.save(`horario_${selectedSemestre}.pdf`);
+  };
+
 
   if (loading) {
     return (
@@ -147,7 +231,7 @@ const MiHorarioView = () => {
           <AlertCircle className="w-12 h-12 text-red-600 mx-auto mb-4" />
           <h2 className="text-xl font-bold text-gray-800 mb-2">Error</h2>
           <p className="text-gray-600 mb-4">{error}</p>
-          <button 
+          <button
             onClick={cargarHorarios}
             className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
           >
@@ -210,7 +294,7 @@ const MiHorarioView = () => {
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Semestre Académico</label>
-            <select 
+            <select
               className="px-4 py-2 border border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-black"
               value={selectedSemestre}
               onChange={(e) => setSelectedSemestre(e.target.value)}
@@ -223,6 +307,7 @@ const MiHorarioView = () => {
             </select>
           </div>
           <div className="flex gap-3">
+            {/* 
             <button 
               onClick={() => setShowSolicitud(!showSolicitud)}
               className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
@@ -230,7 +315,11 @@ const MiHorarioView = () => {
               <Send className="w-4 h-4" />
               Solicitar Cambio
             </button>
-            <button className="flex items-center gap-2 px-4 py-2 bg-white text-blue-600 border border-blue-600 rounded-lg hover:bg-blue-50 transition">
+            */}
+            <button
+              onClick={handleDownloadPDF}
+              className="flex items-center gap-2 px-4 py-2 bg-white text-blue-600 border border-blue-600 rounded-lg hover:bg-blue-50 transition"
+            >
               <Download className="w-4 h-4" />
               Descargar PDF
             </button>
@@ -273,13 +362,12 @@ const MiHorarioView = () => {
                     const key = `${dia}-${hora}`;
                     const clase = horarioProcesado[key];
                     return (
-                      <div 
-                        key={`${dia}-${hora}`} 
-                        className={`p-3 rounded-lg border-2 min-h-[100px] transition ${
-                          clase 
-                            ? `bg-gradient-to-br from-blue-100 to-blue-50 border-blue-400 shadow-sm hover:shadow-md cursor-pointer ${!clase.isStart ? 'border-t-0 rounded-t-none' : ''}`
-                            : 'bg-gray-50 border-gray-200'
-                        }`}
+                      <div
+                        key={`${dia}-${hora}`}
+                        className={`p-3 rounded-lg border-2 min-h-[100px] transition ${clase
+                          ? `bg-gradient-to-br from-blue-100 to-blue-50 border-blue-400 shadow-sm hover:shadow-md cursor-pointer ${!clase.isStart ? 'border-t-0 rounded-t-none' : ''}`
+                          : 'bg-gray-50 border-gray-200'
+                          }`}
                       >
                         {clase && clase.isStart && (
                           <div className="text-xs">

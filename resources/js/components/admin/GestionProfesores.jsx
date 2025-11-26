@@ -9,7 +9,7 @@ const GestionProfesoresView = () => {
   const [modalMode, setModalMode] = useState('create');
   const [selectedProfesor, setSelectedProfesor] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const [showDisponibilidad, setShowDisponibilidad] = useState(false);
+
   const [loading, setLoading] = useState(false);
 
   const [profesores, setProfesores] = useState([]);
@@ -29,9 +29,7 @@ const GestionProfesoresView = () => {
     estado: 'activo'
   });
 
-  const [disponibilidad, setDisponibilidad] = useState({});
-  const dias = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
-  const horas = ['07:00', '08:00', '09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00', '18:00', '19:00', '20:00', '21:00', '22:00', '23:00'];
+
 
   // No necesitamos configurar el token aquí ya que apiClient lo maneja
 
@@ -95,7 +93,6 @@ const GestionProfesoresView = () => {
   const handleCloseModal = () => {
     setShowModal(false);
     setSelectedProfesor(null);
-    setShowDisponibilidad(false);
   };
 
   const saveProfesor = async (closeModal = true) => {
@@ -112,7 +109,7 @@ const GestionProfesoresView = () => {
         showToast('Profesor actualizado exitosamente', 'success');
         await cargarProfesores();
         if (!closeModal) {
-             console.log('Auto-saved successfully');
+          console.log('Auto-saved successfully');
         }
         if (closeModal) handleCloseModal();
       }
@@ -156,41 +153,7 @@ const GestionProfesoresView = () => {
     }
   };
 
-  const cargarDisponibilidad = async (profesor) => {
-    try {
-      const response = await apiClient.get(`/profesores/${profesor.idProfesor}/disponibilidad`);
-      const disp = response?.data?.data ?? response?.data ?? {};
-      setDisponibilidad(disp);
-    } catch (error) {
-      console.error('Error al cargar disponibilidad:', error);
-      showToast('Error al cargar la disponibilidad', 'error');
-    }
-  };
 
-  const guardarDisponibilidad = async () => {
-    if (!selectedProfesor) return;
-
-    setLoading(true);
-    try {
-      await axios.put(`/api/profesores/${selectedProfesor.idProfesor}/disponibilidad`, {
-        disponibilidad: disponibilidad
-      });
-      showToast('Disponibilidad guardada exitosamente', 'success');
-    } catch (error) {
-      console.error('Error al guardar disponibilidad:', error);
-      showToast('Error al guardar la disponibilidad', 'error');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const toggleDisponibilidad = (dia, hora) => {
-    const key = `${dia}-${hora}`;
-    setDisponibilidad(prev => ({
-      ...prev,
-      [key]: !prev[key]
-    }));
-  };
 
   const profesoresArrayForFilter = Array.isArray(profesores) ? profesores : [];
   const term = (searchTerm || '').toString().toLowerCase();
@@ -363,172 +326,103 @@ const GestionProfesoresView = () => {
             </div>
 
             <div className="p-6">
-              <div className="flex border-b border-gray-200 mb-6">
-                <button
-                  type="button"
-                  onClick={() => setShowDisponibilidad(false)}
-                  className={`px-6 py-3 font-semibold ${!showDisponibilidad
-                    ? 'text-blue-600 border-b-2 border-blue-600'
-                    : 'text-gray-600 hover:text-gray-800'
-                    }`}
-                >
-                  Datos Personales
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setShowDisponibilidad(true)}
-                  className={`px-6 py-3 font-semibold ${showDisponibilidad
-                    ? 'text-blue-600 border-b-2 border-blue-600'
-                    : 'text-gray-600 hover:text-gray-800'
-                    }`}
-                >
-                  Disponibilidad Horaria
-                </button>
-              </div>
-
-              {!showDisponibilidad ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-900 mb-2">Nombre</label>
-                    <input
-                      type="text"
-                      disabled={modalMode === 'view'}
-                      className="w-full px-4 py-2 border border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 text-black"
-                      value={formData.nombre}
-                      onChange={(e) => setFormData({ ...formData, nombre: e.target.value })}
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-900 mb-2">Apellido</label>
-                    <input
-                      type="text"
-                      disabled={modalMode === 'view'}
-                      className="w-full px-4 py-2 border border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 text-black"
-                      value={formData.apellido}
-                      onChange={(e) => setFormData({ ...formData, apellido: e.target.value })}
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-900 mb-2">DNI</label>
-                    <input
-                      type="text"
-                      maxLength={8}
-                      disabled={modalMode === 'view'}
-                      className="w-full px-4 py-2 border border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 text-black"
-                      value={formData.dni}
-                      onChange={(e) => setFormData({ ...formData, dni: e.target.value })}
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-900 mb-2">Correo</label>
-                    <input
-                      type="email"
-                      disabled={modalMode === 'view'}
-                      className="w-full px-4 py-2 border border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 text-black"
-                      value={formData.correo}
-                      onChange={(e) => setFormData({ ...formData, correo: e.target.value })}
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-900 mb-2">Teléfono</label>
-                    <input
-                      type="tel"
-                      disabled={modalMode === 'view'}
-                      className="w-full px-4 py-2 border border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 text-black"
-                      value={formData.telefono}
-                      onChange={(e) => setFormData({ ...formData, telefono: e.target.value })}
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-900 mb-2">Categoría</label>
-                    <select
-                      disabled={modalMode === 'view'}
-                      className="w-full px-4 py-2 border border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 text-black"
-                      value={formData.categoria}
-                      onChange={(e) => setFormData({ ...formData, categoria: e.target.value })}
-                    >
-                      <option value="ordinario">Ordinario</option>
-                      <option value="contratado">Contratado</option>
-                      <option value="jefe_practica">Jefe de Práctica</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-900 mb-2">Carga Horaria Máxima</label>
-                    <input
-                      type="number"
-                      min="1"
-                      max="40"
-                      disabled={modalMode === 'view'}
-                      className="w-full px-4 py-2 border border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 text-black"
-                      value={formData.cargaMaxima}
-                      onChange={(e) => setFormData({ ...formData, cargaMaxima: parseInt(e.target.value) })}
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-900 mb-2">Estado</label>
-                    <select
-                      disabled={modalMode === 'view'}
-                      className="w-full px-4 py-2 border border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 text-black"
-                      value={formData.estado}
-                      onChange={(e) => setFormData({ ...formData, estado: e.target.value })}
-                    >
-                      <option value="activo">Activo</option>
-                      <option value="inactivo">Inactivo</option>
-                    </select>
-                  </div>
-                </div>
-              ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
-                  <p className="text-sm text-gray-600 mb-4">
-                    Selecciona los bloques horarios en los que el profesor está disponible
-                  </p>
-                  <div className="overflow-x-auto">
-                    <div className="min-w-[700px]">
-                      <div className="grid grid-cols-7 gap-1">
-                        <div className="bg-blue-600 text-white p-2 rounded text-xs font-semibold text-center">Hora</div>
-                        {dias.map(dia => (
-                          <div key={dia} className="bg-blue-600 text-white p-2 rounded text-xs font-semibold text-center">
-                            {dia}
-                          </div>
-                        ))}
-
-                        {horas.map(hora => (
-                          <React.Fragment key={hora}>
-                            <div className="bg-blue-50 p-2 rounded text-xs font-medium text-center flex items-center justify-center">
-                              {hora}
-                            </div>
-                            {dias.map(dia => {
-                              const key = `${dia}-${hora}`;
-                              const isDisponible = disponibilidad[key];
-                              return (
-                                <button
-                                  key={key}
-                                  type="button"
-                                  onClick={() => toggleDisponibilidad(dia, hora)}
-                                  disabled={modalMode === 'view'}
-                                  className={`p-2 rounded text-xs transition ${isDisponible
-                                    ? 'bg-green-500 text-white hover:bg-green-600'
-                                    : 'bg-gray-100 hover:bg-gray-200'
-                                    } ${modalMode === 'view' ? 'cursor-not-allowed' : 'cursor-pointer'}`}
-                                >
-                                  {isDisponible ? '✓' : ''}
-                                </button>
-                              );
-                            })}
-                          </React.Fragment>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
+                  <label className="block text-sm font-medium text-gray-900 mb-2">Nombre</label>
+                  <input
+                    type="text"
+                    disabled={modalMode === 'view'}
+                    className="w-full px-4 py-2 border border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 text-black"
+                    value={formData.nombre}
+                    onChange={(e) => setFormData({ ...formData, nombre: e.target.value })}
+                  />
                 </div>
-              )}
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-900 mb-2">Apellido</label>
+                  <input
+                    type="text"
+                    disabled={modalMode === 'view'}
+                    className="w-full px-4 py-2 border border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 text-black"
+                    value={formData.apellido}
+                    onChange={(e) => setFormData({ ...formData, apellido: e.target.value })}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-900 mb-2">DNI</label>
+                  <input
+                    type="text"
+                    maxLength={8}
+                    disabled={modalMode === 'view'}
+                    className="w-full px-4 py-2 border border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 text-black"
+                    value={formData.dni}
+                    onChange={(e) => setFormData({ ...formData, dni: e.target.value })}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-900 mb-2">Correo</label>
+                  <input
+                    type="email"
+                    disabled={modalMode === 'view'}
+                    className="w-full px-4 py-2 border border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 text-black"
+                    value={formData.correo}
+                    onChange={(e) => setFormData({ ...formData, correo: e.target.value })}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-900 mb-2">Teléfono</label>
+                  <input
+                    type="tel"
+                    disabled={modalMode === 'view'}
+                    className="w-full px-4 py-2 border border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 text-black"
+                    value={formData.telefono}
+                    onChange={(e) => setFormData({ ...formData, telefono: e.target.value })}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-900 mb-2">Categoría</label>
+                  <select
+                    disabled={modalMode === 'view'}
+                    className="w-full px-4 py-2 border border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 text-black"
+                    value={formData.categoria}
+                    onChange={(e) => setFormData({ ...formData, categoria: e.target.value })}
+                  >
+                    <option value="ordinario">Ordinario</option>
+                    <option value="contratado">Contratado</option>
+                    <option value="jefe_practica">Jefe de Práctica</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-900 mb-2">Carga Horaria Máxima</label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="40"
+                    disabled={modalMode === 'view'}
+                    className="w-full px-4 py-2 border border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 text-black"
+                    value={formData.cargaMaxima}
+                    onChange={(e) => setFormData({ ...formData, cargaMaxima: parseInt(e.target.value) })}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-900 mb-2">Estado</label>
+                  <select
+                    disabled={modalMode === 'view'}
+                    className="w-full px-4 py-2 border border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 text-black"
+                    value={formData.estado}
+                    onChange={(e) => setFormData({ ...formData, estado: e.target.value })}
+                  >
+                    <option value="activo">Activo</option>
+                    <option value="inactivo">Inactivo</option>
+                  </select>
+                </div>
+              </div>
 
               {modalMode !== 'view' && (
                 <div className="flex gap-3 mt-6 pt-6 border-t border-gray-200">

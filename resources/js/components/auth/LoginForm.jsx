@@ -52,20 +52,20 @@ const LoginForm = () => {
       </div>
 
       {/* Grid de fondo sutil */}
-      <div className="absolute inset-0 bg-gradient-to-b from-transparent via-blue-500/5 to-transparent" 
-           style={{ backgroundImage: 'radial-gradient(circle at 1px 1px, rgba(59, 130, 246, 0.1) 1px, transparent 0)', backgroundSize: '40px 40px' }}>
+      <div className="absolute inset-0 bg-gradient-to-b from-transparent via-blue-500/5 to-transparent"
+        style={{ backgroundImage: 'radial-gradient(circle at 1px 1px, rgba(59, 130, 246, 0.1) 1px, transparent 0)', backgroundSize: '40px 40px' }}>
       </div>
 
       {/* Contenedor principal con efecto glassmorphism mejorado */}
       <div className="relative z-10 w-full max-w-md">
         <div className="bg-white/95 backdrop-blur-xl border border-blue-200/50 rounded-3xl shadow-2xl overflow-hidden transform transition-all duration-500 hover:shadow-blue-500/20 hover:shadow-3xl">
-          
+
           {/* Header con gradiente */}
           <div className="relative bg-gradient-to-br from-blue-900 via-blue-800 to-indigo-900 px-8 pt-8 pb-10">
             {/* Decoración superior */}
             <div className="absolute top-0 right-0 w-40 h-40 bg-white/5 rounded-full blur-2xl"></div>
             <div className="absolute bottom-0 left-0 w-32 h-32 bg-indigo-500/20 rounded-full blur-xl"></div>
-            
+
             <div className="relative text-center">
               {/* Logo con animación */}
               <div className="inline-block mb-3 relative group">
@@ -74,7 +74,7 @@ const LoginForm = () => {
                   <span className="text-blue-900 font-black text-xl tracking-tight">UNAP</span>
                 </div>
               </div>
-              
+
               <h1 className="text-xl font-bold text-white mb-1 tracking-tight">
                 Gestión de Horarios
               </h1>
@@ -144,11 +144,10 @@ const LoginForm = () => {
                       onChange={handleChange}
                       onFocus={() => setFocusedField('email')}
                       onBlur={() => setFocusedField(null)}
-                      className={`w-full pl-12 pr-4 py-3.5 bg-gray-50 border-2 rounded-xl font-medium text-gray-800 placeholder-gray-400 transition-all duration-200 focus:outline-none focus:bg-white ${
-                        errors.email 
-                          ? 'border-red-300 focus:border-red-500 focus:ring-4 focus:ring-red-100' 
+                      className={`w-full pl-12 pr-4 py-3.5 bg-gray-50 border-2 rounded-xl font-medium text-gray-800 placeholder-gray-400 transition-all duration-200 focus:outline-none focus:bg-white ${errors.email
+                          ? 'border-red-300 focus:border-red-500 focus:ring-4 focus:ring-red-100'
                           : 'border-gray-200 focus:border-blue-500 focus:ring-4 focus:ring-blue-100'
-                      }`}
+                        }`}
                     />
                   </div>
                 </div>
@@ -194,11 +193,10 @@ const LoginForm = () => {
                       onChange={handleChange}
                       onFocus={() => setFocusedField('password')}
                       onBlur={() => setFocusedField(null)}
-                      className={`w-full pl-12 pr-12 py-3.5 bg-gray-50 border-2 rounded-xl font-medium text-gray-800 placeholder-gray-400 transition-all duration-200 focus:outline-none focus:bg-white ${
-                        errors.password 
-                          ? 'border-red-300 focus:border-red-500 focus:ring-4 focus:ring-red-100' 
+                      className={`w-full pl-12 pr-12 py-3.5 bg-gray-50 border-2 rounded-xl font-medium text-gray-800 placeholder-gray-400 transition-all duration-200 focus:outline-none focus:bg-white ${errors.password
+                          ? 'border-red-300 focus:border-red-500 focus:ring-4 focus:ring-red-100'
                           : 'border-gray-200 focus:border-blue-500 focus:ring-4 focus:ring-blue-100'
-                      }`}
+                        }`}
                     />
                     <button
                       type="button"
@@ -239,12 +237,7 @@ const LoginForm = () => {
                     Recordarme
                   </span>
                 </label>
-                <button
-                  type="button"
-                  className="text-blue-600 hover:text-blue-800 font-medium transition-colors duration-200 hover:underline"
-                >
-                  ¿Olvidaste tu contraseña?
-                </button>
+
               </div>
 
               {/* Botón de envío de login*/}
