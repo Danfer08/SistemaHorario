@@ -17,7 +17,7 @@ const ModalEditarAsignacion = ({ show, onClose, asignacion, profesores, onSave }
       alert('Debe seleccionar un profesor');
       return;
     }
-    onSave(asignacion.id, profesorId);
+    onSave(asignacion.horarioCursoId, profesorId);
   };
 
   return (

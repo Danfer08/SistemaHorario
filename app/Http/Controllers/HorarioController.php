@@ -242,6 +242,38 @@ class HorarioController extends Controller
         }
     }
 
+    public function eliminarSesion(Request $request, $id)
+    {
+        $request->validate([
+            'detalle_id' => 'required|exists:detalle_horario_curso,idDetalle_Horario_Curso'
+        ]);
+
+        try {
+            DB::beginTransaction();
+
+            $detalle = DetalleHorarioCurso::findOrFail($request->detalle_id);
+            $horarioCursoId = $detalle->FK_idHorarioCurso;
+            
+            // Eliminar el detalle (sesión específica)
+            $detalle->delete();
+
+            // Verificar si quedan más detalles para este grupo
+            $restantes = DetalleHorarioCurso::where('FK_idHorarioCurso', $horarioCursoId)->count();
+
+            if ($restantes === 0) {
+                // Si no quedan sesiones, eliminar también el grupo (HorarioCurso)
+                HorarioCurso::where('idHorarioCurso', $horarioCursoId)->delete();
+            }
+
+            DB::commit();
+            return response()->json(['message' => 'Sesión eliminada correctamente']);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json(['message' => 'Error al eliminar la sesión', 'error' => $e->getMessage()], 500);
+        }
+    }
+
     public function actualizarAsignacion(Request $request, $id)
     {
         $request->validate([

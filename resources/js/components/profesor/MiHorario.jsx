@@ -356,55 +356,96 @@ const MiHorarioView = () => {
           </div>
         ) : (
           <div className="min-w-[900px]">
-            <div className="grid grid-cols-7 gap-2">
-              {/* Header */}
-              <div className="bg-blue-600 text-white p-3 rounded-lg font-semibold text-center">
+             <div 
+                className="grid gap-1"
+                style={{
+                  gridTemplateColumns: '80px repeat(6, 1fr)', // 1 col for time, 6 for days
+                  gridTemplateRows: `40px repeat(${horas.length}, 80px)` // Header + Hours
+                }}
+              >
+              {/* Header Row */}
+              <div className="col-start-1 row-start-1 bg-blue-600 text-white p-2 rounded-lg font-semibold text-center text-sm flex items-center justify-center">
                 Hora
               </div>
-              {dias.map(dia => (
-                <div key={dia} className="bg-blue-600 text-white p-3 rounded-lg font-semibold text-center">
+              {dias.map((dia, i) => (
+                <div 
+                  key={dia} 
+                  className="bg-blue-600 text-white p-2 rounded-lg font-semibold text-center text-sm flex items-center justify-center"
+                  style={{ gridColumnStart: i + 2, gridRowStart: 1 }}
+                >
                   {dia}
                 </div>
               ))}
 
-              {/* Filas de horarios */}
-              {horas.map(hora => (
-                <React.Fragment key={hora}>
-                  <div className="bg-blue-50 p-3 rounded-lg font-medium text-center text-gray-700 flex items-center justify-center">
-                    {hora}
-                  </div>
-                  {dias.map(dia => {
-                    const key = `${dia}-${hora}`;
-                    const clase = horarioProcesado[key];
-                    return (
-                      <div
-                        key={`${dia}-${hora}`}
-                        className={`p-3 rounded-lg border-2 min-h-[100px] transition ${clase
-                          ? `bg-gradient-to-br from-blue-100 to-blue-50 border-blue-400 shadow-sm hover:shadow-md cursor-pointer ${!clase.isStart ? 'border-t-0 rounded-t-none' : ''}`
-                          : 'bg-gray-50 border-gray-200'
-                          }`}
-                      >
-                        {clase && clase.isStart && (
-                          <div className="text-xs">
-                            <div className="font-bold text-blue-900 mb-2">{clase.curso}</div>
-                            <div className="flex items-center gap-1 text-gray-700 mb-1">
-                              <span>Ciclo {clase.ciclo} - G{clase.grupo}</span>
-                            </div>
-                            <div className="flex items-center gap-1 text-blue-600 mb-1">
-                              <MapPin className="w-3 h-3" />
-                              <span className="font-medium">{clase.salon}</span>
-                            </div>
-                            <div className="flex items-center gap-1 text-gray-600">
-                              <Users className="w-3 h-3" />
-                              <span>{clase.estudiantes} est.</span>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </React.Fragment>
+              {/* Time Labels (Col 1) */}
+              {horas.map((hora, i) => (
+                <div 
+                  key={hora} 
+                  className="bg-blue-50 p-2 rounded-lg font-medium text-center text-gray-700 text-sm flex items-center justify-center"
+                  style={{ gridColumnStart: 1, gridRowStart: i + 2 }}
+                >
+                  {hora}
+                </div>
               ))}
+
+              {/* Background Grid (Empty Cells) */}
+              {dias.map((dia, dIndex) => (
+                 horas.map((hora, hIndex) => (
+                   <div 
+                     key={`bg-${dia}-${hora}`} 
+                     className="bg-gray-50 rounded-lg border border-gray-100"
+                     style={{ gridColumnStart: dIndex + 2, gridRowStart: hIndex + 2 }}
+                   />
+                 ))
+              ))}
+
+              {/* Events (Merged Blocks) */}
+              {misClases.map((clase) => {
+                 const dIndex = dias.indexOf(clase.dia);
+                 const hIndex = horas.indexOf(clase.hora); // Assuming hora matches exactly "07:00", etc.
+                 
+                 // Handle case where time might not match exactly or needs parsing
+                 // The 'horas' array is "07:00", "08:00"...
+                 // clase.hora comes from DB, usually "07:00:00". We need to match it.
+                 const horaInicioStr = clase.hora.substring(0, 5); // "07:00"
+                 const hIndexMatch = horas.indexOf(horaInicioStr);
+
+                 if (dIndex === -1 || hIndexMatch === -1) return null;
+
+                 const colStart = dIndex + 2;
+                 const rowStart = hIndexMatch + 2;
+                 const rowSpan = getDuracionEnHoras(clase.hora, clase.hora_fin);
+
+                 return (
+                   <div 
+                     key={clase.id}
+                     style={{ 
+                       gridColumnStart: colStart, 
+                       gridRowStart: rowStart, 
+                       gridRowEnd: `span ${rowSpan}`,
+                       zIndex: 10
+                     }}
+                     className="p-1"
+                   >
+                     <div className="h-full w-full bg-gradient-to-br from-blue-100 to-blue-50 border border-blue-400 rounded-lg shadow-sm p-2 relative overflow-hidden flex flex-col justify-center hover:shadow-md transition">
+                        <div className="text-xs text-center">
+                          <p className="font-bold text-blue-900 mb-1 leading-tight">{clase.curso}</p>
+                          <div className="flex items-center justify-center gap-1 text-gray-700 mb-1">
+                             <span>Ciclo {clase.ciclo} - G{clase.grupo}</span>
+                          </div>
+                          <div className="flex items-center justify-center gap-1 text-blue-600 mb-1">
+                             <MapPin className="w-3 h-3" />
+                             <span className="font-medium">{clase.salon}</span>
+                          </div>
+                          <div className="flex items-center justify-center gap-1 text-gray-600">
+                             <Users className="w-3 h-3" />
+                             <span>{clase.estudiantes} est.</span>
+                          </div>
+                        </div>
+                     </div>
+                   </div>
+                 )
+              })}
             </div>
           </div>
         )}

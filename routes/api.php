@@ -36,6 +36,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/{id}/grid', [HorarioController::class, 'grid']);
         Route::post('/{id}/asignar-curso', [HorarioController::class, 'asignarCurso']);
         Route::delete('/{id}/eliminar-asignacion', [HorarioController::class, 'eliminarAsignacion']);
+        Route::delete('/{id}/eliminar-sesion', [HorarioController::class, 'eliminarSesion']);
         Route::get('/{id}/validar-conflictos', [HorarioController::class, 'validarConflictosHorario']);
         Route::post('/{id}/publicar', [HorarioController::class, 'publicar']);
         Route::post('/{id}/generar-automatico', [HorarioController::class, 'generarAutomatico']);

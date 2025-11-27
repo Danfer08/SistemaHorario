@@ -76,7 +76,8 @@ export const useHorarioSoloLectura = (horarioId) => {
         response.data.data.forEach(item => {
           const key = `${item.dia}-${item.hora_inicio || (item.hora ? item.hora.split('-')[0] : '00:00')}`;
           gridData[key] = {
-            id: item.horario_curso_id || item.id, 
+            id: item.id, // ID ÚNICO de la sesión (detalle)
+            horarioCursoId: item.horario_curso_id, // Guardamos también el ID del grupo por si acaso
             idCurso: item.curso_id,
             nombre: item.curso,
             profesor: { 
@@ -116,7 +117,8 @@ export const useHorarioSoloLectura = (horarioId) => {
             if (!ciclo || item.ciclo == ciclo) {
               const key = `${item.dia}-${item.hora_inicio || (item.hora ? item.hora.split('-')[0] : '00:00')}`;
               gridData[key] = {
-                id: item.horario_curso_id || item.id, 
+                id: item.id, // ID ÚNICO de la sesión
+                horarioCursoId: item.horario_curso_id,
                 idCurso: item.curso_id,
                 nombre: item.curso,
                 profesor: { 

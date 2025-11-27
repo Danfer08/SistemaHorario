@@ -141,7 +141,8 @@ export const useHorario = (horarioId) => {
         const key = `${item.dia}-${item.hora.split('-')[0]}`;
         // El ID de la asignación (horario_curso_id) se usará para agrupar
         gridData[key] = {
-          id: item.horario_curso_id,
+          id: item.id, // ID ÚNICO de la sesión (detalle)
+          horarioCursoId: item.horario_curso_id, // ID del grupo (para agrupar/eliminar)
           idCurso: item.curso_id,
           nombre: item.curso,
           profesor: { id: item.profesor_id, nombre: item.profesor },
@@ -184,12 +185,15 @@ export const useHorario = (horarioId) => {
 
   const handleEliminarAsignacion = async (key) => {
     const asignacion = horarioGrid[key];
+    console.log('handleEliminarAsignacion', { key, asignacion });
+    
     if (!asignacion || !horarioActual) return;
 
     try {
-      await axios.delete(`/api/horarios/${horarioActual.idHorario}/eliminar-asignacion`, {
-        // Se elimina por horario_curso_id, que agrupa todas las sesiones de un grupo
-        data: { horario_curso_id: asignacion.id }
+      console.log('Sending delete request with detalle_id:', asignacion.id);
+      await axios.delete(`/api/horarios/${horarioActual.idHorario}/eliminar-sesion`, {
+        // Se elimina por detalle_id (sesión específica)
+        data: { detalle_id: asignacion.id }
       });
 
       // Recargar el grid para reflejar la eliminación
@@ -204,11 +208,35 @@ export const useHorario = (horarioId) => {
       // Esto es una optimización para que el panel de cursos se actualice correctamente.
       setPlanificaciones(prev => {
         const cursoIdEliminado = asignacion.idCurso.toString();
-        const nuevasPlanificaciones = { ...prev };
-        // Si después de la recarga del grid, ya no hay asignaciones para este curso,
-        // limpiamos su planificación para que vuelva a estar disponible para planificar desde cero.
-        const cursoAunAsignado = Object.values(horarioGrid).some(item => item.idCurso.toString() === cursoIdEliminado && item.id !== asignacion.id);
-        if (!cursoAunAsignado) delete nuevasPlanificaciones[cursoIdEliminado];
+        const nuevasPlanificaciones = JSON.parse(JSON.stringify(prev)); // Deep copy
+        
+        // 1. Calcular duración de la sesión eliminada
+        const [hInicio] = asignacion.hora.split(':').map(Number);
+        const [hFin] = asignacion.hora_fin.split(':').map(Number);
+        const duracion = hFin - hInicio;
+
+        // 2. Restaurar sesión al grupo correspondiente
+        if (nuevasPlanificaciones[cursoIdEliminado]) {
+          const grupo = nuevasPlanificaciones[cursoIdEliminado].find(g => g.id === asignacion.grupo);
+          if (grupo) {
+             grupo.sesiones.push({
+               id: Date.now(), // Nuevo ID temporal
+               duracion: duracion
+             });
+          }
+        } else {
+           // Si no existe planificación (caso raro o borrado manual), se podría recrear,
+           // pero por ahora asumimos que si se borró del grid y no hay plan, 
+           // es porque se limpió. Si queremos ser robustos, podríamos recrearla aquí.
+           // Para este requerimiento, asumimos que el usuario quiere verla volver si estaba planificando.
+           nuevasPlanificaciones[cursoIdEliminado] = [{
+             id: asignacion.grupo,
+             profesorId: asignacion.profesor.id,
+             estudiantes: asignacion.estudiantes,
+             sesiones: [{ id: Date.now(), duracion: duracion }]
+           }];
+        }
+
         return nuevasPlanificaciones;
       });
 
